@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -12,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Upload, CheckCircle, X, AlertTriangle, FileText } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { extractTextFromPDF, analyzeResumeWithOpenAI, createRatingFromAnalysis } from "@/services/resumeAnalysis";
 
 const ResumeUpload = () => {
   const { jobOpenings } = useJobOpenings();
@@ -105,54 +105,28 @@ const ResumeUpload = () => {
       const selectedJob = jobOpenings.find(job => job.id === selectedJobId);
       if (!selectedJob) throw new Error("Job not found");
       
-      // Simulate AI analysis (would call external API in real app)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Extract text from PDF
+      const resumeText = await extractTextFromPDF(selectedFile);
       
-      // Generate mock analysis results
-      const criteriaKeys = Object.keys(selectedJob.criteria);
-      const criteriaScores: Record<string, number> = {};
+      // Send to LLM API for analysis
+      const analysisResult = await analyzeResumeWithOpenAI(resumeText, selectedJob.criteria);
       
-      criteriaKeys.forEach(key => {
-        // Random score between 60 and 95
-        criteriaScores[key] = Math.floor(Math.random() * 36) + 60;
-      });
-      
-      // Calculate overall match
-      const totalWeight = Object.values(selectedJob.criteria).reduce((sum, weight) => sum + weight, 0);
-      let weightedSum = 0;
-      
-      Object.entries(criteriaScores).forEach(([key, score]) => {
-        const weight = selectedJob.criteria[key] || 0;
-        weightedSum += (score * weight);
-      });
-      
-      const overallMatch = Math.round(weightedSum / totalWeight);
-      
-      // Generate key phrases
-      const keyPhrases = [
-        `${criteriaKeys[0]} experience demonstrated through projects`,
-        `Strong background in ${criteriaKeys[1]}`,
-        `Demonstrated skills in problem solving`,
-        `Experience working with cross-functional teams`
-      ];
+      // Create rating from analysis
+      const ratingData = createRatingFromAnalysis(newApplicant.id, analysisResult);
       
       // Save rating
-      await addRating({
-        applicantId: newApplicant.id,
-        criteriaScores,
-        overallMatchPercentage: overallMatch,
-        keyPhrases
-      });
+      await addRating(ratingData);
       
       toast({
         title: "Analysis Complete",
-        description: `Your resume scored ${overallMatch}% match for this position`,
+        description: `Your resume scored ${analysisResult.overallMatchPercentage}% match for this position`,
       });
       
       // Navigate to applications view
       navigate('/applicant/applications');
       
     } catch (error) {
+      console.error("Resume upload error:", error);
       toast({
         title: "Error",
         description: "Failed to process your application. Please try again.",
