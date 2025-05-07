@@ -8,7 +8,7 @@ import { Rating } from "@/types";
 // Configuration object for LLM settings
 export const LLMConfig = {
   openAI: {
-    apiKey: process.env.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || "",
+    apiKey: process.env.OPENAI_API_KEY || localStorage.getItem('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') || "",
     model: "gpt-4o",
     setApiKey: (key: string) => {
       localStorage.setItem('openai_api_key', key);
