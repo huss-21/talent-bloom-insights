@@ -163,6 +163,13 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
   const hasRating = !!rating;
   const applicationStatus = hasRating ? "analyzed" : "pending";
   
+  // Helper function to get the appropriate color class based on score
+  const getScoreColorClass = (score: number) => {
+    return score >= 80 ? 'bg-green-600' : 
+           score >= 60 ? 'bg-amber-600' : 
+           'bg-red-600';
+  };
+  
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -206,15 +213,12 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
                   {rating.overallMatchPercentage}%
                 </span>
               </div>
-              <Progress 
-                value={rating.overallMatchPercentage} 
-                className="h-2" 
-                indicatorClassName={
-                  rating.overallMatchPercentage >= 80 ? 'bg-green-600' : 
-                  rating.overallMatchPercentage >= 60 ? 'bg-amber-600' : 
-                  'bg-red-600'
-                }
-              />
+              <div className="relative w-full">
+                <Progress 
+                  value={rating.overallMatchPercentage} 
+                  className={`h-2 ${getScoreColorClass(rating.overallMatchPercentage)}`}
+                />
+              </div>
             </div>
           )}
           
@@ -234,15 +238,12 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
                           {score}%
                         </span>
                       </div>
-                      <Progress 
-                        value={score} 
-                        className="h-1.5" 
-                        indicatorClassName={
-                          score >= 80 ? 'bg-green-600' : 
-                          score >= 60 ? 'bg-amber-600' : 
-                          'bg-red-600'
-                        }
-                      />
+                      <div className="relative w-full">
+                        <Progress 
+                          value={score} 
+                          className={`h-1.5 ${getScoreColorClass(score)}`}
+                        />
+                      </div>
                     </div>
                   ))}
                 </AccordionContent>
