@@ -5,6 +5,52 @@
 
 import { Rating } from "@/types";
 
+// Configuration object for LLM settings
+export const LLMConfig = {
+  openAI: {
+    apiKey: process.env.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || "",
+    model: "gpt-4o",
+    setApiKey: (key: string) => {
+      localStorage.setItem('openai_api_key', key);
+      LLMConfig.openAI.apiKey = key;
+    }
+  },
+  bedrock: {
+    apiKey: process.env.AWS_BEDROCK_API_KEY || localStorage.getItem('aws_bedrock_api_key') || "",
+    model: "amazon.titan-text-express-v1",
+    setApiKey: (key: string) => {
+      localStorage.setItem('aws_bedrock_api_key', key);
+      LLMConfig.bedrock.apiKey = key;
+    }
+  },
+  // Customizable system and user prompt templates for resume analysis
+  prompts: {
+    system: "You are a resume analyzer that evaluates candidates based on job criteria.",
+    user: `
+      Analyze this resume against the following criteria. 
+      Provide scores between 0-100 for each criterion and an overall match percentage.
+      Also include 3-5 key phrases from the resume that match the job requirements.
+      
+      Job Criteria: {{jobCriteria}}
+      
+      Resume Text:
+      {{resumeText}}
+      
+      Respond with a JSON object with this structure:
+      {
+        "criteriaScores": { "criterion1": score1, "criterion2": score2... },
+        "overallMatchPercentage": number,
+        "keyPhrases": ["phrase1", "phrase2", "phrase3"]
+      }
+    `,
+    // Method to update prompts if needed
+    updatePrompts: (system?: string, user?: string) => {
+      if (system) LLMConfig.prompts.system = system;
+      if (user) LLMConfig.prompts.user = user;
+    }
+  }
+};
+
 /**
  * Extract text from a PDF file
  * Note: This is a mock implementation. In a real application, you would use
@@ -26,6 +72,17 @@ export interface ResumeAnalysisResult {
 }
 
 /**
+ * Prepare prompt by replacing template variables with actual values
+ */
+function preparePrompt(template: string, variables: Record<string, any>): string {
+  let prompt = template;
+  Object.entries(variables).forEach(([key, value]) => {
+    prompt = prompt.replace(`{{${key}}}`, JSON.stringify(value));
+  });
+  return prompt;
+}
+
+/**
  * Analyze resume text against job criteria using OpenAI API
  */
 export async function analyzeResumeWithOpenAI(
@@ -35,50 +92,47 @@ export async function analyzeResumeWithOpenAI(
   console.log("Analyzing resume with OpenAI:", resumeText.substring(0, 100) + "...");
   
   try {
-    // In a real implementation, replace with actual API call
+    if (!LLMConfig.openAI.apiKey) {
+      throw new Error("OpenAI API key not configured");
+    }
+    
+    const userPrompt = preparePrompt(LLMConfig.prompts.user, {
+      jobCriteria,
+      resumeText
+    });
+    
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY || "your-api-key"}`
+        "Authorization": `Bearer ${LLMConfig.openAI.apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: LLMConfig.openAI.model,
         messages: [
           {
             role: "system",
-            content: "You are a resume analyzer that evaluates candidates based on job criteria."
+            content: LLMConfig.prompts.system
           },
           {
             role: "user",
-            content: `
-              Analyze this resume against the following criteria. 
-              Provide scores between 0-100 for each criterion and an overall match percentage.
-              Also include 3-5 key phrases from the resume that match the job requirements.
-              
-              Job Criteria: ${JSON.stringify(jobCriteria)}
-              
-              Resume Text:
-              ${resumeText}
-              
-              Respond with a JSON object with this structure:
-              {
-                "criteriaScores": { "criterion1": score1, "criterion2": score2... },
-                "overallMatchPercentage": number,
-                "keyPhrases": ["phrase1", "phrase2", "phrase3"]
-              }
-            `
+            content: userPrompt
           }
         ]
       })
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+    }
 
     const result = await response.json();
     return JSON.parse(result.choices[0].message.content);
   } catch (error) {
     console.error("Error analyzing resume with OpenAI:", error);
     
-    // Return mock data for demonstration
+    // Return mock data for demonstration or if there's an API error
     return {
       criteriaScores: Object.fromEntries(
         Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
@@ -103,20 +157,36 @@ export async function analyzeResumeWithBedrock(
 ): Promise<ResumeAnalysisResult> {
   console.log("Analyzing resume with AWS Bedrock:", resumeText.substring(0, 100) + "...");
   
-  // In a real implementation, replace with actual AWS Bedrock API call
-  // This is a mock implementation
-  return {
-    criteriaScores: Object.fromEntries(
-      Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
-    ),
-    overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
-    keyPhrases: [
-      "Bachelor's degree in Computer Science",
-      "Experience with cloud technologies",
-      "Strong problem-solving abilities",
-      "Excellent communication skills"
-    ]
-  };
+  try {
+    if (!LLMConfig.bedrock.apiKey) {
+      throw new Error("AWS Bedrock API key not configured");
+    }
+    
+    const userPrompt = preparePrompt(LLMConfig.prompts.user, {
+      jobCriteria,
+      resumeText
+    });
+    
+    // In a real implementation, replace with actual AWS Bedrock API call
+    // This is a mock implementation
+    
+    // Return mock data for demonstration
+    return {
+      criteriaScores: Object.fromEntries(
+        Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
+      ),
+      overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
+      keyPhrases: [
+        "Bachelor's degree in Computer Science",
+        "Experience with cloud technologies",
+        "Strong problem-solving abilities",
+        "Excellent communication skills"
+      ]
+    };
+  } catch (error) {
+    console.error("Error analyzing resume with AWS Bedrock:", error);
+    throw error;
+  }
 }
 
 /**
