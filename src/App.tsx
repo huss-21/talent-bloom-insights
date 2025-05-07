@@ -17,6 +17,7 @@ import ApplicantDashboard from "./pages/applicant/Dashboard";
 import JobBrowse from "./pages/applicant/JobBrowse";
 import ResumeUpload from "./pages/applicant/ResumeUpload";
 import ApplicationStatus from "./pages/applicant/ApplicationStatus";
+import Applicants from "./pages/admin/Applicants";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/admin/jobs" element={<JobManagement />} />
             <Route path="/admin/jobs/:jobId/applicants" element={<JobApplicants />} />
             <Route path="/admin/applications" element={<ApplicationReview />} />
+            <Route path="/admin/applicants" element={<Applicants />} />
             
             {/* Applicant Routes */}
             <Route path="/applicant/dashboard" element={<ApplicantDashboard />} />
