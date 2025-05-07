@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -31,6 +30,7 @@ import { JobOpening } from "@/types";
 import { format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Briefcase, Plus, Users, Calendar, X } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface CriterionInput {
   name: string;
@@ -349,9 +349,11 @@ const JobManagement = () => {
                     <Button variant="outline" onClick={() => handleStatusChange(job.id, job.status === "open" ? "closed" : "open")}>
                       {job.status === "open" ? "Mark as Closed" : "Reopen Position"}
                     </Button>
-                    <Button variant="outline">
-                      View Applications ({applicants.length})
-                    </Button>
+                    <Link to={`/admin/jobs/${job.id}/applicants`}>
+                      <Button variant="outline">
+                        View Applications ({applicants.length})
+                      </Button>
+                    </Link>
                   </CardFooter>
                 </Card>
               );

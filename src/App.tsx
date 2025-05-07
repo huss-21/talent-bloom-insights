@@ -11,6 +11,7 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AdminDashboard from "./pages/admin/Dashboard";
 import JobManagement from "./pages/admin/JobManagement";
+import JobApplicants from "./pages/admin/JobApplicants";
 import ApplicationReview from "./pages/admin/ApplicationReview";
 import ApplicantDashboard from "./pages/applicant/Dashboard";
 import JobBrowse from "./pages/applicant/JobBrowse";
@@ -34,6 +35,7 @@ const App = () => (
             {/* Admin Routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/jobs" element={<JobManagement />} />
+            <Route path="/admin/jobs/:jobId/applicants" element={<JobApplicants />} />
             <Route path="/admin/applications" element={<ApplicationReview />} />
             
             {/* Applicant Routes */}
