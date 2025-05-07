@@ -1,0 +1,37 @@
+
+export type Role = "admin" | "applicant";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+}
+
+export interface JobOpening {
+  id: string;
+  title: string;
+  description: string;
+  department: string;
+  criteria: Record<string, number>; // e.g. {"Python": 30, "Project Management": 25}
+  status: "open" | "closed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Applicant {
+  id: string;
+  userId: string;
+  jobId: string;
+  resumeUrl: string;
+  applicationDate: string;
+}
+
+export interface Rating {
+  id: string;
+  applicantId: string;
+  criteriaScores: Record<string, number>; // e.g. {"Python": 85, "Project Management": 70}
+  overallMatchPercentage: number;
+  keyPhrases: string[];
+  createdAt: string;
+}
