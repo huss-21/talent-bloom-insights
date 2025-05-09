@@ -50,6 +50,7 @@ const ResumeUpload = () => {
       fullName: currentUser?.name || "",
       nationalId: "",
     },
+    mode: "onChange" // Enable validation on change for better UX
   });
   
   useEffect(() => {
@@ -128,14 +129,20 @@ const ResumeUpload = () => {
       
       console.log("Uploading resume to:", filePath);
       
-      // Create storage bucket if it doesn't exist (will be handled by Supabase)
-      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('resumes');
-      
-      if (bucketError && bucketError.message.includes('does not exist')) {
-        await supabase.storage.createBucket('resumes', {
-          public: false,
-          fileSizeLimit: 5242880 // 5MB
-        });
+      // Check if 'resumes' bucket exists and create it if it doesn't
+      try {
+        const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('resumes');
+        
+        if (bucketError && bucketError.message.includes('does not exist')) {
+          console.log("Creating resumes bucket");
+          await supabase.storage.createBucket('resumes', {
+            public: false,
+            fileSizeLimit: 5242880 // 5MB
+          });
+        }
+      } catch (bucketErr) {
+        console.error("Error checking/creating bucket:", bucketErr);
+        // Continue with upload attempt anyway
       }
       
       // Upload the file to Supabase Storage
@@ -144,7 +151,7 @@ const ResumeUpload = () => {
         .from('resumes')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
-          upsert: false,
+          upsert: true, // Changed to true to handle potential duplicates
           contentType: 'application/pdf'
         });
       
@@ -238,7 +245,14 @@ const ResumeUpload = () => {
                 {/* Job Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="job">Select Position</Label>
-                  <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                  <Select 
+                    value={selectedJobId} 
+                    onValueChange={(value) => {
+                      setSelectedJobId(value);
+                      // Force form validation update
+                      form.trigger();
+                    }}
+                  >
                     <SelectTrigger id="job">
                       <SelectValue placeholder="Select a job opening" />
                     </SelectTrigger>
@@ -313,7 +327,10 @@ const ResumeUpload = () => {
                 {/* File Upload */}
                 <div className="space-y-2">
                   <Label htmlFor="resume">Upload Resume (PDF only, max 5MB)</Label>
-                  <div className="border-2 border-dashed rounded-md px-6 py-8">
+                  <div 
+                    className="border-2 border-dashed rounded-md px-6 py-8 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => !selectedFile && document.getElementById('resume')?.click()}
+                  >
                     <div className="flex flex-col items-center">
                       {selectedFile ? (
                         <div className="flex flex-col items-center">
@@ -327,7 +344,12 @@ const ResumeUpload = () => {
                             variant="ghost" 
                             size="sm" 
                             className="mt-2"
-                            onClick={() => setSelectedFile(null)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFile(null);
+                              // Update form validation
+                              form.trigger();
+                            }}
                           >
                             <X className="h-4 w-4 mr-1" /> Remove
                           </Button>
@@ -343,12 +365,19 @@ const ResumeUpload = () => {
                             type="file"
                             className="hidden"
                             accept=".pdf"
-                            onChange={handleFileChange}
+                            onChange={(e) => {
+                              handleFileChange(e);
+                              // Update form validation
+                              form.trigger();
+                            }}
                           />
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => document.getElementById('resume')?.click()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              document.getElementById('resume')?.click();
+                            }}
                           >
                             <Upload className="mr-2 h-4 w-4" /> Browse Files
                           </Button>
@@ -390,10 +419,13 @@ const ResumeUpload = () => {
                 <Button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700"
-                  disabled={isUploading || !form.formState.isValid || !selectedFile || !selectedJobId}
+                  disabled={isUploading}
                 >
                   {isUploading ? (
-                    <>Uploading...</>
+                    <>
+                      <span className="animate-pulse mr-2">•</span> 
+                      Uploading...
+                    </>
                   ) : (
                     <>Submit Application</>
                   )}
