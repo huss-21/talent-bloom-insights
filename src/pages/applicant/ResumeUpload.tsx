@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -12,6 +13,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Upload, CheckCircle, X, AlertTriangle, FileText } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { extractTextFromPDF, analyzeResumeWithOpenAI, createRatingFromAnalysis } from "@/services/resumeAnalysis";
+import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 const ResumeUpload = () => {
   const { jobOpenings } = useJobOpenings();
@@ -78,9 +81,32 @@ const ResumeUpload = () => {
     try {
       setIsUploading(true);
       
-      // In a real app, we would upload the file to Supabase Storage
-      // For now we'll just simulate it with a URL
-      const resumeUrl = `/uploads/${selectedFile.name}`;
+      // Generate a unique file path for the resume
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `${currentUser.id}/${fileName}`;
+      
+      // Upload the file to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('resumes')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'application/pdf'
+        });
+      
+      if (uploadError) {
+        throw new Error(`Error uploading file: ${uploadError.message}`);
+      }
+      
+      // Get the public URL for the uploaded file
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('resumes')
+        .getPublicUrl(filePath);
+      
+      const resumeUrl = publicUrlData.publicUrl;
       
       // Create applicant record in the database
       const newApplicant = await addApplication({
@@ -89,7 +115,9 @@ const ResumeUpload = () => {
         fullName: currentUser.name || 'Unnamed User',
         email: currentUser.email,
         resumeUrl,
-        coverLetter: ''
+        coverLetter: '',
+        resumeFileName: selectedFile.name,
+        resumeFilePath: filePath
       });
       
       toast({

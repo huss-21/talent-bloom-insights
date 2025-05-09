@@ -8,6 +8,7 @@ import { ArrowLeft, Download, FileText, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -24,7 +25,7 @@ import { ApplicantRatingCharts } from "@/components/ApplicantRatingCharts";
 const JobApplicants = () => {
   const { jobId } = useParams();
   const { getJobById } = useJobOpenings();
-  const { applicants, ratings, getApplicantsByJobId, getRatingByApplicantId } = useApplicants();
+  const { applicants, ratings, getApplicantsByJobId, getRatingByApplicantId, getResumeDownloadUrl } = useApplicants();
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(null);
   
   const job = jobId ? getJobById(jobId) : null;
@@ -44,6 +45,41 @@ const JobApplicants = () => {
       setSelectedApplicantId(jobApplicants[0].id);
     }
   }, [jobApplicants, selectedApplicantId]);
+
+  // Handle resume download
+  const handleDownloadResume = async () => {
+    if (!selectedApplicant || !selectedApplicant.resumeFilePath) {
+      toast({
+        title: "Download Error",
+        description: "Resume file not available",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const downloadUrl = await getResumeDownloadUrl(selectedApplicant.resumeFilePath);
+      
+      if (!downloadUrl) {
+        toast({
+          title: "Download Error",
+          description: "Could not generate download URL",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Open the download URL in a new tab
+      window.open(downloadUrl, '_blank');
+    } catch (error) {
+      console.error("Resume download error:", error);
+      toast({
+        title: "Download Error",
+        description: "Failed to download resume",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (!job) {
     return (
@@ -180,7 +216,7 @@ const JobApplicants = () => {
                               <User className="h-4 w-4" />
                             </div>
                             <div>
-                              <h3 className="font-medium">Applicant #{applicant.id}</h3>
+                              <h3 className="font-medium">{applicant.fullName || `Applicant #${applicant.id.slice(0, 8)}`}</h3>
                               <p className="text-xs text-muted-foreground">
                                 Applied on {format(new Date(applicant.applicationDate), "MMM d, yyyy")}
                               </p>
@@ -207,7 +243,7 @@ const JobApplicants = () => {
               <CardHeader>
                 <CardTitle>Applicant Details</CardTitle>
                 <CardDescription>
-                  {selectedApplicant ? `Details for Applicant #${selectedApplicant.id}` : "Select an applicant to view details"}
+                  {selectedApplicant ? `Details for ${selectedApplicant.fullName || `Applicant #${selectedApplicant.id.slice(0, 8)}`}` : "Select an applicant to view details"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -226,7 +262,7 @@ const JobApplicants = () => {
                             <User className="h-8 w-8" />
                           </div>
                           <div>
-                            <h3 className="text-xl font-semibold">Applicant #{selectedApplicant.id}</h3>
+                            <h3 className="text-xl font-semibold">{selectedApplicant.fullName || `Applicant #${selectedApplicant.id.slice(0, 8)}`}</h3>
                             <p className="text-sm text-muted-foreground">
                               Applied on {format(new Date(selectedApplicant.applicationDate), "MMMM d, yyyy")}
                             </p>
@@ -279,16 +315,27 @@ const JobApplicants = () => {
                       <TabsContent value="resume" className="space-y-6 mt-6">
                         <div className="flex justify-between items-center">
                           <h4 className="text-lg font-medium">Resume</h4>
-                          <Button variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" /> Download Resume
-                          </Button>
+                          {selectedApplicant.resumeFilePath && (
+                            <Button variant="outline" size="sm" onClick={handleDownloadResume}>
+                              <Download className="mr-2 h-4 w-4" /> Download Resume
+                            </Button>
+                          )}
                         </div>
                         
                         <div className="border rounded-md p-8 flex flex-col items-center justify-center bg-gray-50 min-h-[300px]">
                           <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                          <p className="text-sm text-muted-foreground">
-                            Resume preview not available. Click the download button to view the resume.
-                          </p>
+                          {selectedApplicant.resumeFileName ? (
+                            <div className="text-center">
+                              <p className="text-sm font-medium">{selectedApplicant.resumeFileName}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Click the download button to view the resume.
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              Resume preview not available. Click the download button to view the resume.
+                            </p>
+                          )}
                         </div>
                         
                         <Separator />

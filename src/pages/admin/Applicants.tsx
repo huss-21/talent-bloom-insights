@@ -1,15 +1,15 @@
-
 import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { format } from "date-fns";
-import { User, FileText, Search, CheckCircle, Clock, XCircle } from "lucide-react";
+import { User, FileText, Search, CheckCircle, Clock, XCircle, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Applicants = () => {
-  const { applicants, ratings, getRatingByApplicantId, loading } = useApplicants();
+  const { applicants, ratings, getRatingByApplicantId, loading, getResumeDownloadUrl } = useApplicants();
   const { jobOpenings, getJobById } = useJobOpenings();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -74,6 +74,41 @@ const Applicants = () => {
     return true;
   });
 
+  // Handle resume download
+  const handleDownloadResume = async (applicant: Applicant) => {
+    if (!applicant.resumeFilePath) {
+      toast({
+        title: "Download Error",
+        description: "Resume file path not found",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const downloadUrl = await getResumeDownloadUrl(applicant.resumeFilePath);
+      
+      if (!downloadUrl) {
+        toast({
+          title: "Download Error",
+          description: "Could not generate download URL",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Open the download URL in a new tab
+      window.open(downloadUrl, '_blank');
+    } catch (error) {
+      console.error("Resume download error:", error);
+      toast({
+        title: "Download Error",
+        description: "Failed to download resume",
+        variant: "destructive",
+      });
+    }
+  };
+  
   // Get score color class based on rating percentage
   const getScoreColorClass = (score: number) => {
     if (score >= 80) return "text-green-600";
@@ -247,6 +282,12 @@ const Applicants = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-2">
+                              {applicant.resumeFilePath && (
+                                <Button size="sm" variant="outline" onClick={() => handleDownloadResume(applicant)}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Resume
+                                </Button>
+                              )}
                               <Button asChild size="sm" variant="ghost">
                                 <Link to={`/admin/jobs/${applicant.jobId}/applicants`}>
                                   <FileText className="h-4 w-4 mr-2" />

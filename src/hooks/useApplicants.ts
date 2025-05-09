@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -134,6 +133,8 @@ export const useApplicants = () => {
             fullName: app.full_name,
             email: app.email,
             resumeUrl: app.resume_url || '',
+            resumeFileName: app.resume_file_name || '',
+            resumeFilePath: app.resume_file_path || '',
             applicationDate: app.applied_at,
             status: app.status,
             matchScore: app.match_score
@@ -216,6 +217,8 @@ export const useApplicants = () => {
     email: string;
     resumeUrl?: string;
     coverLetter?: string;
+    resumeFileName?: string;
+    resumeFilePath?: string;
   }) => {
     try {
       // Insert into Supabase
@@ -228,6 +231,8 @@ export const useApplicants = () => {
           email: application.email,
           resume_url: application.resumeUrl || null,
           cover_letter: application.coverLetter || null,
+          resume_file_name: application.resumeFileName || null,
+          resume_file_path: application.resumeFilePath || null,
         })
         .select()
         .single();
@@ -244,6 +249,8 @@ export const useApplicants = () => {
         fullName: data.full_name,
         email: data.email,
         resumeUrl: data.resume_url || '',
+        resumeFileName: data.resume_file_name || '',
+        resumeFilePath: data.resume_file_path || '',
         applicationDate: data.applied_at,
         status: data.status,
         matchScore: data.match_score
@@ -378,6 +385,23 @@ export const useApplicants = () => {
     return applicants.filter(applicant => applicant.userId === userId);
   };
 
+  // Function to get the resume download URL
+  const getResumeDownloadUrl = async (filePath: string) => {
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from('resumes')
+        .createSignedUrl(filePath, 60); // URL valid for 60 seconds
+      
+      if (error) throw error;
+      
+      return data.signedUrl;
+    } catch (error) {
+      console.error("Error getting download URL:", error);
+      return null;
+    }
+  };
+
   return {
     applicants,
     ratings,
@@ -387,6 +411,7 @@ export const useApplicants = () => {
     addRating,
     getApplicantsByJobId,
     getRatingByApplicantId,
-    getApplicantsByUserId
+    getApplicantsByUserId,
+    getResumeDownloadUrl
   };
 };

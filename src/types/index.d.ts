@@ -9,6 +9,8 @@ export interface Applicant {
   email?: string;
   status?: string;
   matchScore?: number | null;
+  resumeFileName?: string;
+  resumeFilePath?: string;
 }
 
 export interface Rating {
