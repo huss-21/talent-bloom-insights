@@ -25,7 +25,19 @@ export const useJobs = () => {
         return;
       }
 
-      setJobs(data || []);
+      // Convert Supabase data to Job type with proper skills_and_requirements conversion
+      const processedJobs: Job[] = (data || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        department: item.department,
+        description: item.description,
+        status: item.status,
+        skills_and_requirements: item.skills_and_requirements as Record<string, number>,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
+
+      setJobs(processedJobs);
     } catch (error) {
       console.error("Error fetching jobs:", error);
       toast({
@@ -59,8 +71,20 @@ export const useJobs = () => {
         return null;
       }
 
-      setJobs([data, ...jobs]);
-      return data;
+      // Convert the returned data to match Job type
+      const newJob: Job = {
+        id: data.id,
+        title: data.title,
+        department: data.department,
+        description: data.description,
+        status: data.status,
+        skills_and_requirements: data.skills_and_requirements as Record<string, number>,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
+
+      setJobs([newJob, ...jobs]);
+      return newJob;
     } catch (error) {
       console.error("Error adding job:", error);
       toast({
