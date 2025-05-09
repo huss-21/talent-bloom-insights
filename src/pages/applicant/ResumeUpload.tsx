@@ -11,13 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Upload, CheckCircle, X, AlertTriangle, FileText, User, IdCard } from "lucide-react";
+import { Upload, CheckCircle, X, AlertTriangle, FileText, User, IdCard, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const applicationFormSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -38,6 +39,7 @@ const ResumeUpload = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isJobLoading, setIsJobLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Get the jobId from query parameter
   const queryParams = new URLSearchParams(location.search);
@@ -53,25 +55,28 @@ const ResumeUpload = () => {
     mode: "onChange" // Enable validation on change for better UX
   });
   
-  // Make sure to refresh jobs on component mount
+  // Make sure to refresh jobs on component mount and when jobId changes
   useEffect(() => {
+    console.log("ResumeUpload component mounted or jobId changed, refreshing jobs...");
     refreshJobs();
-  }, [refreshJobs]);
+  }, [refreshJobs, jobIdFromQuery]);
   
-  // Effect to load the selected job
+  // Effect to load the selected job with retry logic
   useEffect(() => {
     if (!jobIdFromQuery) {
+      console.log("No jobId provided in query parameters");
       setIsJobLoading(false);
       return;
     }
     
-    // Wait for jobs to load before finding the selected job
+    // If jobs are still loading, wait
     if (jobsLoading) {
+      console.log("Jobs still loading, waiting...");
       return;
     }
 
-    console.log("Looking for job with ID:", jobIdFromQuery);
-    console.log("Available jobs:", jobs);
+    console.log(`Looking for job with ID: ${jobIdFromQuery}`);
+    console.log(`Available jobs (${jobs.length}):`, jobs);
     
     const job = jobs.find(job => job.id === jobIdFromQuery);
     if (job) {
@@ -79,18 +84,28 @@ const ResumeUpload = () => {
       setSelectedJob(job);
       setIsJobLoading(false);
     } else {
-      console.error("Job not found with ID:", jobIdFromQuery);
-      // Only show the error toast if we've actually finished loading jobs
-      if (!jobsLoading) {
+      console.warn(`Job not found with ID: ${jobIdFromQuery}`);
+      
+      // If we haven't found the job but have tried less than 3 times, try refreshing jobs again
+      if (retryCount < 3 && jobs.length > 0) {
+        console.log(`Retry attempt ${retryCount + 1} to find job...`);
+        setRetryCount(prev => prev + 1);
+        refreshJobs();
+      } else if (jobs.length === 0) {
+        // If no jobs are loaded at all, refresh once more
+        console.log("No jobs loaded at all, refreshing...");
+        refreshJobs();
+      } else {
+        // After 3 retries or if jobs are loaded but this one isn't found
+        setIsJobLoading(false);
         toast({
           title: "Job not found",
           description: "The job you're trying to apply for doesn't exist or has been removed.",
           variant: "destructive",
         });
-        navigate('/applicant/jobs');
       }
     }
-  }, [jobIdFromQuery, jobs, navigate, jobsLoading, refreshJobs]);
+  }, [jobIdFromQuery, jobs, navigate, jobsLoading, refreshJobs, retryCount]);
   
   // Check if user has already applied to this job
   useEffect(() => {
@@ -257,15 +272,37 @@ const ResumeUpload = () => {
     }
   };
   
-  if (jobsLoading || isJobLoading) {
+  // Show loading skeleton during initial loading
+  if (jobsLoading || (isJobLoading && retryCount < 3)) {
     return (
       <MainLayout roles={["applicant"]}>
         <div className="max-w-2xl mx-auto p-4">
           <Card>
-            <CardContent className="pt-6">
-              <p className="text-center">Loading job details...</p>
+            <CardHeader>
+              <Skeleton className="h-8 w-3/4 mb-2" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <Skeleton className="h-24 w-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-10 w-full" />
+              </div>
             </CardContent>
+            <CardFooter>
+              <Skeleton className="h-10 w-full" />
+            </CardFooter>
           </Card>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+            <div className="bg-white p-4 rounded-lg shadow-lg flex items-center">
+              <Loader2 className="animate-spin h-6 w-6 mr-2 text-blue-600" />
+              <span>Loading job details...</span>
+            </div>
+          </div>
         </div>
       </MainLayout>
     );
@@ -281,6 +318,8 @@ const ResumeUpload = () => {
                 <div className="flex-grow">
                   <h3 className="font-bold">Job not found</h3>
                   <p>The job you're trying to apply for doesn't exist or has been removed.</p>
+                  <p className="text-sm mt-2">Job ID: {jobIdFromQuery || 'None'}</p>
+                  <p className="text-sm">Available jobs: {jobs.length}</p>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -327,11 +366,15 @@ const ResumeUpload = () => {
                   <div>
                     <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
                     <div className="flex flex-wrap gap-2">
-                      {Object.entries(selectedJob.skills_and_requirements || {}).map(([name, weight]) => (
+                      {typeof selectedJob.skills_and_requirements === 'object' && Object.entries(selectedJob.skills_and_requirements || {}).map(([name, weight]) => (
                         <Badge key={name} variant="outline" className="bg-corporate-gray-100">
                           {name}: {typeof weight === 'number' ? `${weight}%` : String(weight)}
                         </Badge>
                       ))}
+                      
+                      {typeof selectedJob.skills_and_requirements !== 'object' && (
+                        <p className="text-sm text-muted-foreground">No specific skills listed</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -473,7 +516,7 @@ const ResumeUpload = () => {
                 >
                   {isUploading ? (
                     <>
-                      <span className="animate-pulse mr-2">•</span> 
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
                       Uploading...
                     </>
                   ) : (

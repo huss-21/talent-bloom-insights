@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Job } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -7,16 +7,22 @@ import { toast } from "@/hooks/use-toast";
 export const useJobs = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log("Fetching jobs from Supabase...");
       const { data, error } = await supabase
         .from('jobs')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error("Supabase error:", error);
+        setError(error.message);
         toast({
           title: "Error",
           description: "Failed to fetch jobs. " + error.message,
@@ -37,10 +43,12 @@ export const useJobs = () => {
         updated_at: item.updated_at
       }));
 
+      console.log(`Successfully fetched ${processedJobs.length} jobs`);
       setJobs(processedJobs);
-      console.log("Fetched jobs:", processedJobs);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("Error fetching jobs:", error);
+      setError(errorMessage);
       toast({
         title: "Error",
         description: "An unexpected error occurred while fetching jobs.",
@@ -49,11 +57,11 @@ export const useJobs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [fetchJobs]);
 
   const addJob = async (job: Omit<Job, "id" | "created_at" | "updated_at">) => {
     try {
@@ -86,7 +94,7 @@ export const useJobs = () => {
         updated_at: data.updated_at
       };
 
-      setJobs([newJob, ...jobs]);
+      setJobs(prevJobs => [newJob, ...prevJobs]);
       return newJob;
     } catch (error) {
       console.error("Error adding job:", error);
@@ -133,12 +141,15 @@ export const useJobs = () => {
   };
 
   const getJobById = (id: string) => {
-    return jobs.find(job => job.id === id) || null;
+    const foundJob = jobs.find(job => job.id === id);
+    console.log(`getJobById(${id}):`, foundJob || "not found");
+    return foundJob || null;
   };
 
   return {
     jobs,
     loading,
+    error,
     addJob,
     updateJobStatus,
     getJobById,

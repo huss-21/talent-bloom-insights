@@ -17,13 +17,14 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Filter, Calendar, Briefcase, Upload, X } from "lucide-react";
+import { Search, Filter, Calendar, Briefcase, Upload, X, Loader2, RefreshCcw } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Job } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const JobBrowse = () => {
-  const { jobs, loading } = useJobs();
+  const { jobs, loading, error, refreshJobs } = useJobs();
   const { applicants, getApplicantsByUserId } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -34,18 +35,30 @@ const JobBrowse = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [userApplications, setUserApplications] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Get query parameters
   const queryParams = new URLSearchParams(location.search);
   const jobIdFromQuery = queryParams.get('id');
   
+  // Manual refresh function with visual feedback
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshJobs();
+    setTimeout(() => setIsRefreshing(false), 500); // Minimum visual feedback time
+  };
+  
   // Set selected job from query parameter if available
   useEffect(() => {
-    if (jobIdFromQuery) {
+    if (jobIdFromQuery && jobs.length > 0) {
+      console.log(`Looking for job with ID from query: ${jobIdFromQuery}`);
       const job = jobs.find(job => job.id === jobIdFromQuery);
       if (job) {
+        console.log("Found job from query parameter:", job);
         setSelectedJob(job);
         setIsDialogOpen(true);
+      } else {
+        console.warn(`Job not found with ID from query: ${jobIdFromQuery}`);
       }
     }
   }, [jobIdFromQuery, jobs]);
@@ -55,6 +68,7 @@ const JobBrowse = () => {
     if (currentUser) {
       const apps = getApplicantsByUserId(currentUser.id);
       setUserApplications(apps);
+      console.log("User applications loaded:", apps.length);
     }
   }, [currentUser, getApplicantsByUserId]);
   
@@ -116,12 +130,62 @@ const JobBrowse = () => {
     navigate(`/applicant/upload?jobId=${jobId}`);
   };
   
+  if (error) {
+    return (
+      <MainLayout roles={["applicant"]}>
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Browse Job Openings</h1>
+              <p className="text-muted-foreground">Explore available positions and apply</p>
+            </div>
+          </div>
+          
+          <Card className="p-8 text-center">
+            <div className="text-red-500 mb-4">
+              <AlertTriangle className="mx-auto h-12 w-12" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Error Loading Jobs</h3>
+            <p className="text-muted-foreground mb-4">We encountered a problem while loading job listings.</p>
+            <Button 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Refreshing...</>
+              ) : (
+                <><RefreshCcw className="mr-2 h-4 w-4" /> Try Again</>
+              )}
+            </Button>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+  
   return (
     <MainLayout roles={["applicant"]}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Browse Job Openings</h1>
-          <p className="text-muted-foreground">Explore available positions and apply</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Browse Job Openings</h1>
+            <p className="text-muted-foreground">Explore available positions and apply</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="relative"
+            >
+              <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {loading && !isRefreshing && (
+                <span className="absolute top-0 right-0 h-2 w-2 bg-blue-500 rounded-full animate-pulse"></span>
+              )}
+            </Button>
+          </div>
         </div>
         
         {/* Search and Filters */}
@@ -168,10 +232,40 @@ const JobBrowse = () => {
         {/* Job Listings */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {loading ? (
-            <div className="col-span-full p-8 text-center">
-              <Briefcase className="mx-auto h-12 w-12 text-muted-foreground animate-pulse" />
-              <h3 className="mt-2 text-lg font-medium">Loading jobs...</h3>
-            </div>
+            // Loading skeletons
+            Array(6).fill(0).map((_, index) => (
+              <Card key={`skeleton-${index}`} className="overflow-hidden">
+                <CardHeader>
+                  <div className="flex justify-between">
+                    <div>
+                      <Skeleton className="h-5 w-40 mb-2" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-4 w-full mb-1" />
+                  <Skeleton className="h-4 w-full mb-1" />
+                  <Skeleton className="h-4 w-3/4 mb-4" />
+                  
+                  <Skeleton className="h-4 w-40 mb-4" />
+                  
+                  <div>
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <div className="flex flex-wrap gap-2">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex flex-col gap-2">
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                </CardFooter>
+              </Card>
+            ))
           ) : filteredJobs.length === 0 ? (
             <div className="col-span-full p-8 text-center">
               <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -213,13 +307,16 @@ const JobBrowse = () => {
                     <div>
                       <h4 className="text-sm font-medium mb-2">Key Skills Required:</h4>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(job.skills_and_requirements).slice(0, 3).map(([name, weight]) => (
+                        {typeof job.skills_and_requirements === 'object' && Object.entries(job.skills_and_requirements).slice(0, 3).map(([name, weight]) => (
                           <Badge key={name} variant="outline" className="bg-corporate-gray-100">
                             {name}
                           </Badge>
                         ))}
-                        {Object.keys(job.skills_and_requirements).length > 3 && (
+                        {typeof job.skills_and_requirements === 'object' && Object.keys(job.skills_and_requirements).length > 3 && (
                           <Badge variant="outline">+{Object.keys(job.skills_and_requirements).length - 3} more</Badge>
+                        )}
+                        {typeof job.skills_and_requirements !== 'object' && (
+                          <Badge variant="outline">General skills</Badge>
                         )}
                       </div>
                     </div>
@@ -287,12 +384,18 @@ const JobBrowse = () => {
                 <div className="space-y-2">
                   <h4 className="font-medium">Skills & Requirements</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(selectedJob.skills_and_requirements).map(([name, weight]) => (
+                    {typeof selectedJob.skills_and_requirements === 'object' && Object.entries(selectedJob.skills_and_requirements).map(([name, weight]) => (
                       <div key={name} className="flex justify-between items-center text-sm p-2 border rounded-md">
                         <span>{name}</span>
                         <Badge>{typeof weight === 'number' ? `${weight}%` : weight}</Badge>
                       </div>
                     ))}
+                    
+                    {typeof selectedJob.skills_and_requirements !== 'object' && (
+                      <div className="col-span-2 text-sm text-muted-foreground p-2 border rounded-md">
+                        No specific skills and requirements listed for this position
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
