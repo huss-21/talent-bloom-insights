@@ -144,6 +144,11 @@ const Applicants = () => {
     }
   };
 
+  useEffect(() => {
+    console.log("All applicants:", applicants);
+    console.log("Displayed applicants:", displayedApplicants);
+  }, [applicants, displayedApplicants]);
+
   return (
     <MainLayout roles={["admin"]}>
       <div className="space-y-6">
@@ -253,10 +258,10 @@ const Applicants = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            {format(new Date(applicant.applicationDate), "MMM d, yyyy")}
+                            {applicant.applicationDate ? format(new Date(applicant.applicationDate), "MMM d, yyyy") : "Unknown date"}
                           </TableCell>
                           <TableCell>
-                            {matchScore ? (
+                            {matchScore !== null ? (
                               <div className="flex items-center space-x-2">
                                 <span className={`font-medium ${getScoreColorClass(matchScore)}`}>
                                   {matchScore}%
