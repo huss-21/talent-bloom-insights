@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -214,9 +215,14 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, getResum
   const jobDepartment = application.jobOpening ? application.jobOpening.department : application.job?.department;
   
   // Fix the job status handling to properly work with both string and boolean types
-  const jobStatus = application.jobOpening 
-    ? application.jobOpening.status 
-    : (application.job?.status ? "open" : "closed");
+  let jobStatus: "open" | "closed";
+  if (application.jobOpening) {
+    jobStatus = application.jobOpening.status;
+  } else if (application.job) {
+    jobStatus = application.job.status ? "open" : "closed";
+  } else {
+    jobStatus = "closed"; // Default fallback
+  }
   
   // Helper function to get the appropriate color class based on score
   const getScoreColorClass = (score: number) => {
@@ -251,10 +257,8 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, getResum
             <CardTitle>{jobTitle}</CardTitle>
             <CardDescription>{jobDepartment}</CardDescription>
           </div>
-          <Badge variant={jobStatus === "open" || jobStatus === true ? "default" : "secondary"}>
-            {typeof jobStatus === "string" 
-              ? jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1) 
-              : jobStatus ? "Open" : "Closed"}
+          <Badge variant={jobStatus === "open" ? "default" : "secondary"}>
+            {jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)}
           </Badge>
         </div>
       </CardHeader>
