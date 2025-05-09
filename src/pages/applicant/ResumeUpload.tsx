@@ -129,29 +129,13 @@ const ResumeUpload = () => {
       
       console.log("Uploading resume to:", filePath);
       
-      // Check if 'resumes' bucket exists and create it if it doesn't
-      try {
-        const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('resumes');
-        
-        if (bucketError && bucketError.message.includes('does not exist')) {
-          console.log("Creating resumes bucket");
-          await supabase.storage.createBucket('resumes', {
-            public: false,
-            fileSizeLimit: 5242880 // 5MB
-          });
-        }
-      } catch (bucketErr) {
-        console.error("Error checking/creating bucket:", bucketErr);
-        // Continue with upload attempt anyway
-      }
-      
       // Upload the file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase
         .storage
         .from('resumes')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
-          upsert: true, // Changed to true to handle potential duplicates
+          upsert: true,
           contentType: 'application/pdf'
         });
       
