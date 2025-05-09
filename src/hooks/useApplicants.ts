@@ -113,66 +113,81 @@ export const useApplicants = () => {
         // Fetch applicants
         const { data: applicantsData, error: applicantsError } = await supabase
           .from('applicants')
-          .select('*');
+          .select('*')
+          .order('application_date', { ascending: false });
 
         if (applicantsError) {
           throw applicantsError;
         }
 
-        // Transform data to match our Applicant type
-        const transformedApplicants: Applicant[] = applicantsData.map((app) => ({
-          id: app.id,
-          userId: app.user_id,
-          jobId: app.job_id,
-          resumeUrl: app.resume_url,
-          applicationDate: app.application_date
-        }));
-        
-        setApplicants(transformedApplicants);
-        console.log("Fetched applicants:", transformedApplicants);
+        if (!applicantsData || applicantsData.length === 0) {
+          console.log("No applicants found in database, using mock data");
+          setApplicants(MOCK_APPLICANTS);
+        } else {
+          // Transform data to match our Applicant type
+          const transformedApplicants: Applicant[] = applicantsData.map((app) => ({
+            id: app.id,
+            userId: app.user_id,
+            jobId: app.job_id,
+            resumeUrl: app.resume_url,
+            applicationDate: app.application_date
+          }));
+          
+          setApplicants(transformedApplicants);
+          console.log("Fetched applicants:", transformedApplicants);
+        }
 
         // Fetch ratings
         const { data: ratingsData, error: ratingsError } = await supabase
           .from('ratings')
-          .select('*');
+          .select('*')
+          .order('created_at', { ascending: false });
 
         if (ratingsError) {
           throw ratingsError;
         }
 
-        // Transform data to match our Rating type
-        const transformedRatings: Rating[] = ratingsData.map((rating) => {
-          // Ensure criteria_scores is properly converted to Record<string, number>
-          const criteriaScores: Record<string, number> = {};
+        if (!ratingsData || ratingsData.length === 0) {
+          console.log("No ratings found in database, using mock data");
+          setRatings(MOCK_RATINGS);
+        } else {
+          // Transform data to match our Rating type
+          const transformedRatings: Rating[] = ratingsData.map((rating) => {
+            // Parse criteria_scores from JSON if needed
+            let criteriaScores: Record<string, number> = {};
+            
+            try {
+              if (typeof rating.criteria_scores === 'string') {
+                criteriaScores = JSON.parse(rating.criteria_scores);
+              } else if (rating.criteria_scores && typeof rating.criteria_scores === 'object') {
+                criteriaScores = rating.criteria_scores as Record<string, number>;
+              }
+            } catch (error) {
+              console.error("Error parsing criteria scores:", error);
+              criteriaScores = {};
+            }
+            
+            return {
+              id: rating.id,
+              applicantId: rating.applicant_id,
+              criteriaScores: criteriaScores,
+              overallMatchPercentage: rating.overall_match_percentage,
+              skillsMatchPercentage: rating.skills_match_percentage,
+              educationMatchPercentage: rating.education_match_percentage,
+              experienceMatchPercentage: rating.experience_match_percentage,
+              keyPhrases: Array.isArray(rating.key_phrases) ? rating.key_phrases : [],
+              createdAt: rating.created_at
+            };
+          });
           
-          // Handle JSON data from Supabase
-          if (rating.criteria_scores && typeof rating.criteria_scores === 'object') {
-            Object.entries(rating.criteria_scores).forEach(([key, value]) => {
-              // Ensure each value is a number
-              criteriaScores[key] = typeof value === 'number' ? value : 0;
-            });
-          }
-          
-          return {
-            id: rating.id,
-            applicantId: rating.applicant_id,
-            criteriaScores: criteriaScores,
-            overallMatchPercentage: rating.overall_match_percentage,
-            skillsMatchPercentage: rating.skills_match_percentage,
-            educationMatchPercentage: rating.education_match_percentage,
-            experienceMatchPercentage: rating.experience_match_percentage,
-            keyPhrases: Array.isArray(rating.key_phrases) ? rating.key_phrases : [],
-            createdAt: rating.created_at
-          };
-        });
-        
-        setRatings(transformedRatings);
-        console.log("Fetched ratings:", transformedRatings);
+          setRatings(transformedRatings);
+          console.log("Fetched ratings:", transformedRatings);
+        }
       } catch (error) {
         console.error("Error fetching applicants data:", error);
         toast({
           title: "Error",
-          description: "Failed to load applicants data",
+          description: "Failed to load applicants data. Using mock data instead.",
           variant: "destructive",
         });
         

@@ -26,6 +26,7 @@ const Applicants = () => {
   const { applicants, ratings, getRatingByApplicantId, loading } = useApplicants();
   const { jobOpenings, getJobById } = useJobOpenings();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
   
   // Filter applicants based on search query
   const filteredApplicants = applicants.filter(applicant => {
@@ -37,6 +38,25 @@ const Applicants = () => {
     return job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
            job.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
            applicant.id.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  // Filter based on active tab
+  const displayedApplicants = filteredApplicants.filter(applicant => {
+    if (activeTab === "all") return true;
+    
+    const rating = getRatingByApplicantId(applicant.id);
+    if (activeTab === "highMatch" && rating) {
+      return rating.overallMatchPercentage >= 80;
+    }
+    
+    if (activeTab === "recent") {
+      // Get applications from the last 7 days
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      return new Date(applicant.applicationDate) >= oneWeekAgo;
+    }
+    
+    return true;
   });
 
   // Get score color class based on rating percentage
@@ -68,7 +88,12 @@ const Applicants = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <Tabs defaultValue="all" className="w-[320px]">
+            <Tabs 
+              defaultValue="all" 
+              className="w-[320px]"
+              value={activeTab}
+              onValueChange={setActiveTab}
+            >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="highMatch">High Match</TabsTrigger>
@@ -80,7 +105,7 @@ const Applicants = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Applicants ({loading ? "..." : filteredApplicants.length})</CardTitle>
+            <CardTitle>Applicants ({loading ? "..." : displayedApplicants.length})</CardTitle>
             <CardDescription>
               Review all applicants and their match scores
             </CardDescription>
@@ -98,7 +123,7 @@ const Applicants = () => {
                   </div>
                 ))}
               </div>
-            ) : filteredApplicants.length === 0 ? (
+            ) : displayedApplicants.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-muted-foreground">No applicants found</p>
               </div>
@@ -116,7 +141,7 @@ const Applicants = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredApplicants.map((applicant) => {
+                    {displayedApplicants.map((applicant) => {
                       const job = getJobById(applicant.jobId);
                       const rating = getRatingByApplicantId(applicant.id);
                       const matchScore = rating ? rating.overallMatchPercentage : null;
