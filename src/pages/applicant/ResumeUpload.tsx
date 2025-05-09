@@ -12,13 +12,12 @@ import { toast } from "@/hooks/use-toast";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Upload, CheckCircle, X, AlertTriangle, FileText } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { extractTextFromPDF, analyzeResumeWithOpenAI, createRatingFromAnalysis } from "@/services/resumeAnalysis";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 
 const ResumeUpload = () => {
   const { jobOpenings } = useJobOpenings();
-  const { addApplication, addRating } = useApplicants();
+  const { addApplication } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -86,6 +85,17 @@ const ResumeUpload = () => {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${currentUser.id}/${fileName}`;
       
+      // Check if the resumes bucket exists, create if it doesn't
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const resumesBucketExists = buckets?.some(bucket => bucket.name === 'resumes');
+      
+      if (!resumesBucketExists) {
+        await supabase.storage.createBucket('resumes', {
+          public: false,
+          fileSizeLimit: 5 * 1024 * 1024 // 5MB
+        });
+      }
+      
       // Upload the file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase
         .storage
@@ -120,44 +130,23 @@ const ResumeUpload = () => {
         resumeFilePath: filePath
       });
       
-      toast({
-        title: "Resume Uploaded",
-        description: "Your resume has been successfully uploaded",
-      });
-      
-      // Start analysis process
-      setIsUploading(false);
-      setIsAnalyzing(true);
-      
-      // Get job criteria for analysis
-      const selectedJob = jobOpenings.find(job => job.id === selectedJobId);
-      if (!selectedJob) throw new Error("Job not found");
-      
-      // Extract text from PDF (would be real in production)
-      const resumeText = await extractTextFromPDF(selectedFile);
-      
-      // Send to LLM API for analysis
-      const analysisResult = await analyzeResumeWithOpenAI(resumeText, selectedJob.criteria);
-      
-      // Create rating from analysis and store in database
-      const ratingData = createRatingFromAnalysis(newApplicant.id, analysisResult);
-      
-      // Save rating to database
-      await addRating(ratingData);
+      if (!newApplicant) {
+        throw new Error("Failed to create application");
+      }
       
       toast({
-        title: "Analysis Complete",
-        description: `Your resume scored ${analysisResult.overallMatchPercentage}% match for this position`,
+        title: "Application Submitted",
+        description: "Your resume has been successfully uploaded and your application has been submitted.",
       });
       
       // Navigate to applications view
       navigate('/applicant/applications');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Resume upload error:", error);
       toast({
         title: "Error",
-        description: "Failed to process your application. Please try again.",
+        description: error?.message || "Failed to process your application. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -194,7 +183,7 @@ const ResumeUpload = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {jobOpenings
-                      .filter(job => job.status === "open")
+                      .filter(job => job.status === true)
                       .map(job => (
                         <SelectItem key={job.id} value={job.id}>
                           {job.title} - {job.department}
@@ -213,9 +202,9 @@ const ResumeUpload = () => {
                   <div>
                     <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
                     <div className="flex flex-wrap gap-2">
-                      {Object.entries(selectedJob.criteria).map(([name, weight]) => (
+                      {Object.entries(selectedJob.criteria || selectedJob.skills_and_requirements || {}).map(([name, weight]) => (
                         <Badge key={name} variant="outline" className="bg-corporate-gray-100">
-                          {name}: {weight}%
+                          {name}: {typeof weight === 'number' ? `${weight}%` : weight}
                         </Badge>
                       ))}
                     </div>
@@ -230,7 +219,7 @@ const ResumeUpload = () => {
                   <div className="flex flex-col items-center">
                     {selectedFile ? (
                       <div className="flex flex-col items-center">
-                        <CheckCircle className="h-8 w-8 text-corporate-teal mb-2" />
+                        <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
                         <p className="font-medium">{selectedFile.name}</p>
                         <p className="text-sm text-muted-foreground">
                           {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
@@ -278,15 +267,14 @@ const ResumeUpload = () => {
               </div>
               
               {/* Process Description */}
-              <div className="p-4 bg-corporate-blue/10 rounded-md">
+              <div className="p-4 bg-blue-50 rounded-md">
                 <h4 className="font-medium mb-2 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-2 text-corporate-teal" /> What happens next?
+                  <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> What happens next?
                 </h4>
                 <ul className="space-y-1 text-sm">
                   <li>1. Your resume will be uploaded and stored securely</li>
-                  <li>2. Our AI will analyze your resume against job requirements</li>
-                  <li>3. You'll receive a match score and detailed breakdown</li>
-                  <li>4. Hiring managers will be notified of your application</li>
+                  <li>2. Hiring managers will be notified of your application</li>
+                  <li>3. You can track the status of your application in your dashboard</li>
                 </ul>
               </div>
             </CardContent>
@@ -296,20 +284,18 @@ const ResumeUpload = () => {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/applicant/jobs')}
-                disabled={isUploading || isAnalyzing}
+                disabled={isUploading}
               >
                 Cancel
               </Button>
               
               <Button
                 type="submit"
-                className="bg-corporate-blue hover:bg-corporate-blue-light"
-                disabled={!selectedJobId || !selectedFile || isUploading || isAnalyzing}
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={!selectedJobId || !selectedFile || isUploading}
               >
                 {isUploading ? (
                   <>Uploading...</>
-                ) : isAnalyzing ? (
-                  <>Analyzing Resume...</>
                 ) : (
                   <>Submit Application</>
                 )}

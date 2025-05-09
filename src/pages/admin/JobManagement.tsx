@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useJobs } from "@/hooks/useJobs";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -19,6 +18,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Briefcase, Plus, Users, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import JobForm, { JobFormData } from "@/components/JobForm";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CriterionInput {
   name: string;
