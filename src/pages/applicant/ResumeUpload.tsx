@@ -183,7 +183,7 @@ const ResumeUpload = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {jobOpenings
-                      .filter(job => job.status === true)
+                      .filter(job => job.status === "open")
                       .map(job => (
                         <SelectItem key={job.id} value={job.id}>
                           {job.title} - {job.department}
@@ -202,9 +202,9 @@ const ResumeUpload = () => {
                   <div>
                     <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
                     <div className="flex flex-wrap gap-2">
-                      {Object.entries(selectedJob.criteria || selectedJob.skills_and_requirements || {}).map(([name, weight]) => (
+                      {Object.entries(selectedJob.criteria || {}).map(([name, weight]) => (
                         <Badge key={name} variant="outline" className="bg-corporate-gray-100">
-                          {name}: {typeof weight === 'number' ? `${weight}%` : weight}
+                          {name}: {typeof weight === 'number' ? `${weight}%` : String(weight)}
                         </Badge>
                       ))}
                     </div>
