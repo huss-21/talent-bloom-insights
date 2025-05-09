@@ -91,10 +91,28 @@ const ResumeUpload = () => {
   };
   
   const onSubmit = async (values: ApplicationFormValues) => {
-    if (!selectedJobId || !selectedFile || !currentUser) {
+    if (!selectedJobId) {
       toast({
         title: "Validation Error",
-        description: "Please select a job and upload a PDF resume",
+        description: "Please select a job to apply for",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please upload your resume",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentUser) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to apply",
         variant: "destructive",
       });
       return;
@@ -109,6 +127,16 @@ const ResumeUpload = () => {
       const filePath = `${currentUser.id}/${fileName}`;
       
       console.log("Uploading resume to:", filePath);
+      
+      // Create storage bucket if it doesn't exist (will be handled by Supabase)
+      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('resumes');
+      
+      if (bucketError && bucketError.message.includes('does not exist')) {
+        await supabase.storage.createBucket('resumes', {
+          public: false,
+          fileSizeLimit: 5242880 // 5MB
+        });
+      }
       
       // Upload the file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase
@@ -362,7 +390,7 @@ const ResumeUpload = () => {
                 <Button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700"
-                  disabled={!selectedJobId || !selectedFile || isUploading || !form.formState.isValid}
+                  disabled={isUploading || !form.formState.isValid || !selectedFile || !selectedJobId}
                 >
                   {isUploading ? (
                     <>Uploading...</>
