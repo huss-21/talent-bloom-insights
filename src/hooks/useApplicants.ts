@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -142,7 +143,7 @@ export const useApplicants = () => {
           console.log("Fetched applications:", transformedApplicants);
         }
 
-        // 3. Fetch ratings (keeping the existing code for ratings)
+        // 3. Fetch ratings from the database
         const { data: ratingsData, error: ratingsError } = await supabase
           .from('ratings')
           .select('*')
@@ -327,6 +328,22 @@ export const useApplicants = () => {
 
       // Update local state
       setRatings((prevRatings) => [...prevRatings, newRating]);
+      
+      // Also update the match score in the job_applications table
+      await supabase
+        .from('job_applications')
+        .update({ match_score: newRating.overallMatchPercentage })
+        .eq('id', rating.applicantId);
+      
+      // Update the applicant's matchScore in the local state
+      setApplicants(prevApplicants => 
+        prevApplicants.map(app => 
+          app.id === rating.applicantId 
+            ? { ...app, matchScore: newRating.overallMatchPercentage }
+            : app
+        )
+      );
+      
       console.log("Added new rating:", newRating);
       return newRating;
     } catch (error) {

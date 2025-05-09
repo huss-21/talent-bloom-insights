@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
