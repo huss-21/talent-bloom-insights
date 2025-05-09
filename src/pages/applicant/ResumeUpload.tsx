@@ -1,12 +1,9 @@
-
 import React, { useState, useEffect } from "react";
-import { useJobOpenings } from "@/hooks/useJobOpenings";
+import { useJobs } from "@/hooks/useJobs";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -28,18 +25,18 @@ const applicationFormSchema = z.object({
 type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 const ResumeUpload = () => {
-  const { jobOpenings, loading: jobsLoading } = useJobOpenings();
-  const { addApplication } = useApplicants();
+  const { jobs, loading: jobsLoading } = useJobs();
+  const { addApplication, getApplicantsByUserId } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [selectedJob, setSelectedJob] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Get the jobId from query parameter if available
+  // Get the jobId from query parameter
   const queryParams = new URLSearchParams(location.search);
   const jobIdFromQuery = queryParams.get('jobId');
   
@@ -53,19 +50,47 @@ const ResumeUpload = () => {
     mode: "onChange" // Enable validation on change for better UX
   });
   
+  // Effect to load the selected job
   useEffect(() => {
-    if (jobIdFromQuery && jobOpenings && jobOpenings.length > 0) {
-      const job = jobOpenings.find(job => job.id === jobIdFromQuery);
-      if (job) {
-        setSelectedJobId(job.id);
-      }
-    }
+    if (!jobIdFromQuery || !jobs) return;
     
-    // Set the name from currentUser when it's available
+    const job = jobs.find(job => job.id === jobIdFromQuery);
+    if (job) {
+      setSelectedJob(job);
+    } else {
+      // If job not found, redirect back to jobs page
+      toast({
+        title: "Job not found",
+        description: "The job you're trying to apply for doesn't exist or has been removed.",
+        variant: "destructive",
+      });
+      navigate('/applicant/jobs');
+    }
+  }, [jobIdFromQuery, jobs, navigate]);
+  
+  // Check if user has already applied to this job
+  useEffect(() => {
+    if (!currentUser || !jobIdFromQuery) return;
+    
+    const userApplications = getApplicantsByUserId(currentUser.id);
+    const hasAlreadyApplied = userApplications.some(app => app.jobId === jobIdFromQuery);
+    
+    if (hasAlreadyApplied) {
+      toast({
+        title: "Already Applied",
+        description: "You have already applied for this position.",
+        variant: "default",
+      });
+      navigate('/applicant/jobs');
+    }
+  }, [currentUser, jobIdFromQuery, getApplicantsByUserId, navigate]);
+  
+  // Set the name from currentUser when it's available
+  useEffect(() => {
     if (currentUser?.name) {
       form.setValue("fullName", currentUser.name);
     }
-  }, [jobIdFromQuery, jobOpenings, currentUser, form]);
+  }, [currentUser, form]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,10 +117,10 @@ const ResumeUpload = () => {
   };
   
   const onSubmit = async (values: ApplicationFormValues) => {
-    if (!selectedJobId) {
+    if (!selectedJob) {
       toast({
-        title: "Validation Error",
-        description: "Please select a job to apply for",
+        title: "Error",
+        description: "No job selected. Please go back and select a job to apply for.",
         variant: "destructive",
       });
       return;
@@ -155,8 +180,7 @@ const ResumeUpload = () => {
       const resumeUrl = publicUrlData.publicUrl;
       console.log("Resume URL:", resumeUrl);
       
-      // Get the selected job to access its description
-      const selectedJob = jobOpenings.find(job => job.id === selectedJobId);
+      // Get the job description
       const jobDescription = selectedJob ? selectedJob.description : '';
       
       // Create applicant record in the database
@@ -164,7 +188,7 @@ const ResumeUpload = () => {
       
       // Log the types for debugging
       console.log("User ID type:", typeof userId, "Value:", userId);
-      console.log("Job ID type:", typeof selectedJobId, "Value:", selectedJobId);
+      console.log("Job ID type:", typeof selectedJob.id, "Value:", selectedJob.id);
       
       // Generate UUIDs if the existing IDs are not in UUID format
       try {
@@ -176,7 +200,7 @@ const ResumeUpload = () => {
         }
         
         // Same for job ID
-        let jobId = selectedJobId;
+        let jobId = selectedJob.id;
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
           console.log("Job ID is not a valid UUID, generating a new one");
           jobId = uuidv4();
@@ -224,17 +248,13 @@ const ResumeUpload = () => {
     }
   };
   
-  const selectedJob = selectedJobId 
-    ? jobOpenings?.find(job => job.id === selectedJobId) 
-    : null;
-  
-  if (jobsLoading) {
+  if (jobsLoading || !selectedJob) {
     return (
       <MainLayout roles={["applicant"]}>
         <div className="max-w-2xl mx-auto p-4">
           <Card>
             <CardContent className="pt-6">
-              <p className="text-center">Loading job openings...</p>
+              <p className="text-center">Loading job details...</p>
             </CardContent>
           </Card>
         </div>
@@ -253,55 +273,27 @@ const ResumeUpload = () => {
               <CardHeader>
                 <CardTitle>Resume Upload</CardTitle>
                 <CardDescription>
-                  Upload your resume to apply for a position
+                  Upload your resume to apply for this position
                 </CardDescription>
               </CardHeader>
               
               <CardContent className="space-y-6">
-                {/* Job Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="job">Select Position</Label>
-                  <Select 
-                    value={selectedJobId} 
-                    onValueChange={(value) => {
-                      setSelectedJobId(value);
-                      // Force form validation update
-                      form.trigger();
-                    }}
-                  >
-                    <SelectTrigger id="job">
-                      <SelectValue placeholder="Select a job opening" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {jobOpenings && jobOpenings
-                        .filter(job => job.status === "open")
-                        .map(job => (
-                          <SelectItem key={job.id} value={job.id}>
-                            {job.title} - {job.department}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
                 {/* Selected Job Info */}
-                {selectedJob && (
-                  <div className="p-4 border rounded-md bg-muted/50">
-                    <h3 className="font-medium mb-1">{selectedJob.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">{selectedJob.department}</p>
-                    
-                    <div>
-                      <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(selectedJob.criteria || {}).map(([name, weight]) => (
-                          <Badge key={name} variant="outline" className="bg-corporate-gray-100">
-                            {name}: {typeof weight === 'number' ? `${weight}%` : String(weight)}
-                          </Badge>
-                        ))}
-                      </div>
+                <div className="p-4 border rounded-md bg-muted/50">
+                  <h3 className="font-medium mb-1">{selectedJob.title}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">{selectedJob.department}</p>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(selectedJob.skills_and_requirements || {}).map(([name, weight]) => (
+                        <Badge key={name} variant="outline" className="bg-corporate-gray-100">
+                          {name}: {typeof weight === 'number' ? `${weight}%` : String(weight)}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-                )}
+                </div>
                 
                 {/* Personal Information */}
                 <div className="grid gap-4 md:grid-cols-2">
@@ -347,6 +339,7 @@ const ResumeUpload = () => {
                     className="border-2 border-dashed rounded-md px-6 py-8 cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => !selectedFile && document.getElementById('resume')?.click()}
                   >
+                    
                     <div className="flex flex-col items-center">
                       {selectedFile ? (
                         <div className="flex flex-col items-center">

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useJobs } from "@/hooks/useJobs";
 import { useApplicants } from "@/hooks/useApplicants";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,13 +33,14 @@ const JobBrowse = () => {
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [userApplications, setUserApplications] = useState<any[]>([]);
   
   // Get query parameters
   const queryParams = new URLSearchParams(location.search);
   const jobIdFromQuery = queryParams.get('id');
   
   // Set selected job from query parameter if available
-  React.useEffect(() => {
+  useEffect(() => {
     if (jobIdFromQuery) {
       const job = jobs.find(job => job.id === jobIdFromQuery);
       if (job) {
@@ -48,6 +49,14 @@ const JobBrowse = () => {
       }
     }
   }, [jobIdFromQuery, jobs]);
+  
+  // Load user applications
+  useEffect(() => {
+    if (currentUser) {
+      const apps = getApplicantsByUserId(currentUser.id);
+      setUserApplications(apps);
+    }
+  }, [currentUser, getApplicantsByUserId]);
   
   // Get all available departments
   const departments = Array.from(new Set(jobs.map(job => job.department)));
@@ -68,8 +77,7 @@ const JobBrowse = () => {
   
   // Check if user has already applied for a job
   const hasAppliedToJob = (jobId: string) => {
-    if (!currentUser) return false;
-    const userApplications = getApplicantsByUserId(currentUser.id);
+    if (!currentUser || !userApplications.length) return false;
     return userApplications.some(app => app.jobId === jobId);
   };
   
@@ -293,19 +301,24 @@ const JobBrowse = () => {
                 <Button variant="outline" onClick={closeJobDetails}>
                   Close
                 </Button>
-                <Button
-                  className="bg-corporate-blue hover:bg-corporate-blue-light"
-                  disabled={!selectedJob.status || hasAppliedToJob(selectedJob.id)}
-                  onClick={() => applyForJob(selectedJob.id)}
-                >
-                  {hasAppliedToJob(selectedJob.id) ? (
-                    "Already Applied"
-                  ) : !selectedJob.status ? (
-                    "Position Closed"
-                  ) : (
-                    "Apply Now"
-                  )}
-                </Button>
+                
+                {/* Show different buttons based on application status */}
+                {hasAppliedToJob(selectedJob.id) ? (
+                  <Button
+                    variant="secondary"
+                    disabled
+                  >
+                    Already Applied
+                  </Button>
+                ) : (
+                  <Button
+                    className="bg-corporate-blue hover:bg-corporate-blue-light"
+                    disabled={!selectedJob.status}
+                    onClick={() => applyForJob(selectedJob.id)}
+                  >
+                    {!selectedJob.status ? "Position Closed" : "Apply Now"}
+                  </Button>
+                )}
               </DialogFooter>
             </>
           )}
