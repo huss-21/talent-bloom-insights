@@ -8,7 +8,7 @@ import { Rating } from "@/types";
 // Configuration object for LLM settings
 export const LLMConfig = {
   openAI: {
-    apiKey: process.env.OPENAI_API_KEY || localStorage.getItem('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') || "",
+    apiKey: process.env.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || "",
     model: "gpt-4o",
     setApiKey: (key: string) => {
       localStorage.setItem('openai_api_key', key);
@@ -31,10 +31,10 @@ export const LLMConfig = {
       Provide scores between 0-100 for each criterion and an overall match percentage.
       Also include 3-5 key phrases from the resume that match the job requirements.
       
-      Job Criteria: {{jobCriteria}}
+      Job Criteria: {jobCriteria}
       
       Resume Text:
-      {{resumeText}}
+      {resumeText}
       
       Respond with a JSON object with this structure:
       {
@@ -77,7 +77,7 @@ export interface ResumeAnalysisResult {
 function preparePrompt(template: string, variables: Record<string, any>): string {
   let prompt = template;
   Object.entries(variables).forEach(([key, value]) => {
-    prompt = prompt.replace(`{{${key}}}`, JSON.stringify(value));
+    prompt = prompt.replace(`{${key}}`, JSON.stringify(value));
   });
   return prompt;
 }
