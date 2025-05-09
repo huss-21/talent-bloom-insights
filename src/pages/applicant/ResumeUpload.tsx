@@ -156,29 +156,65 @@ const ResumeUpload = () => {
       console.log("Resume URL:", resumeUrl);
       
       // Create applicant record in the database
-      const newApplicant = await addApplication({
-        userId: currentUser.id,
-        jobId: selectedJobId,
-        fullName: values.fullName,
-        email: currentUser.email,
-        resumeUrl,
-        nationalId: values.nationalId,
-        coverLetter: '',
-        resumeFileName: selectedFile.name,
-        resumeFilePath: filePath
-      });
+      // Ensure we're using valid UUIDs for user_id and job_id
+      // If currentUser.id is not a UUID, generate a new one
+      let userId = currentUser.id;
       
-      if (!newApplicant) {
-        throw new Error("Failed to create application");
+      // Log the types for debugging
+      console.log("User ID type:", typeof userId, "Value:", userId);
+      console.log("Job ID type:", typeof selectedJobId, "Value:", selectedJobId);
+      
+      // Generate UUIDs if the existing IDs are not in UUID format
+      try {
+        // Check if the current IDs are valid UUIDs by trying to parse them
+        // This will throw an error if they're not valid UUIDs
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+          console.log("User ID is not a valid UUID, generating a new one");
+          // Generate a deterministic UUID based on the user ID
+          userId = uuidv4({
+            random: Array.from(userId.toString().padEnd(16, '0')).map(c => c.charCodeAt(0))
+          });
+          console.log("Generated UUID for user:", userId);
+        }
+        
+        // Same for job ID
+        let jobId = selectedJobId;
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
+          console.log("Job ID is not a valid UUID, generating a new one");
+          // Generate a deterministic UUID based on the job ID
+          jobId = uuidv4({
+            random: Array.from(jobId.toString().padEnd(16, '0')).map(c => c.charCodeAt(0))
+          });
+          console.log("Generated UUID for job:", jobId);
+        }
+      
+        const newApplicant = await addApplication({
+          userId: userId,
+          jobId: jobId,
+          fullName: values.fullName,
+          email: currentUser.email,
+          resumeUrl,
+          nationalId: values.nationalId,
+          coverLetter: '',
+          resumeFileName: selectedFile.name,
+          resumeFilePath: filePath
+        });
+        
+        if (!newApplicant) {
+          throw new Error("Failed to create application");
+        }
+        
+        toast({
+          title: "Application Submitted",
+          description: "Your resume has been successfully uploaded and your application has been submitted.",
+        });
+        
+        // Navigate to applications view
+        navigate('/applicant/applications');
+      } catch (idError) {
+        console.error("Error with UUID conversion:", idError);
+        throw new Error(`Invalid ID format: ${idError.message}`);
       }
-      
-      toast({
-        title: "Application Submitted",
-        description: "Your resume has been successfully uploaded and your application has been submitted.",
-      });
-      
-      // Navigate to applications view
-      navigate('/applicant/applications');
       
     } catch (error: any) {
       console.error("Resume upload error:", error);

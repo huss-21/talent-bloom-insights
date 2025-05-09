@@ -243,7 +243,7 @@ export const useApplicants = () => {
         .single();
 
       if (error) {
-        console.error("Error inserting application:", error);
+        console.error("Supabase error:", error);
         throw error;
       }
 
