@@ -178,7 +178,7 @@ const LLMConfig = () => {
                       rows={10}
                     />
                     <p className="text-sm text-muted-foreground">
-                      The template can use placeholders like {{"{{"}}jobCriteria{{"}}"}} and {{"{{"}}resumeText{{"}}"}} which will be replaced with actual values
+                      The template can use placeholders like {"{{"}}jobCriteria{{"}}"}}} and {"{{"}}resumeText{{"}}"}}} which will be replaced with actual values
                     </p>
                   </div>
                 </div>
@@ -198,10 +198,10 @@ const LLMConfig = () => {
               <CardContent>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="font-mono bg-muted p-2 rounded">{{"{{"}}jobCriteria{{"}}"}}</div>
+                    <div className="font-mono bg-muted p-2 rounded">{"{{"}}jobCriteria{{"}}"}}</div>
                     <div>The criteria object from the job posting</div>
                     
-                    <div className="font-mono bg-muted p-2 rounded">{{"{{"}}resumeText{{"}}"}}</div>
+                    <div className="font-mono bg-muted p-2 rounded">{"{{"}}resumeText{{"}}"}}</div>
                     <div>The extracted text from the resume PDF</div>
                   </div>
                 </div>
