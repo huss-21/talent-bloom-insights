@@ -1,6 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 // Mock data for applicants
 const MOCK_APPLICANTS: Applicant[] = [
@@ -102,12 +103,64 @@ export const useApplicants = () => {
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch applicants and ratings from Supabase
   useEffect(() => {
-    // In a real app, this would be an API call
-    const loadApplicants = async () => {
+    const fetchApplicantsAndRatings = async () => {
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setLoading(true);
+        
+        // Fetch applicants
+        const { data: applicantsData, error: applicantsError } = await supabase
+          .from('applicants')
+          .select('*');
+
+        if (applicantsError) {
+          throw applicantsError;
+        }
+
+        // Transform data to match our Applicant type
+        const transformedApplicants: Applicant[] = applicantsData.map((app) => ({
+          id: app.id,
+          userId: app.user_id,
+          jobId: app.job_id,
+          resumeUrl: app.resume_url,
+          applicationDate: app.application_date
+        }));
+        
+        setApplicants(transformedApplicants);
+
+        // Fetch ratings
+        const { data: ratingsData, error: ratingsError } = await supabase
+          .from('ratings')
+          .select('*');
+
+        if (ratingsError) {
+          throw ratingsError;
+        }
+
+        // Transform data to match our Rating type
+        const transformedRatings: Rating[] = ratingsData.map((rating) => ({
+          id: rating.id,
+          applicantId: rating.applicant_id,
+          criteriaScores: rating.criteria_scores as Record<string, number>,
+          overallMatchPercentage: rating.overall_match_percentage,
+          skillsMatchPercentage: rating.skills_match_percentage,
+          educationMatchPercentage: rating.education_match_percentage,
+          experienceMatchPercentage: rating.experience_match_percentage,
+          keyPhrases: rating.key_phrases,
+          createdAt: rating.created_at
+        }));
+        
+        setRatings(transformedRatings);
+      } catch (error) {
+        console.error("Error fetching applicants data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load applicants data",
+          variant: "destructive",
+        });
+        
+        // Fall back to mock data if there's an error
         setApplicants(MOCK_APPLICANTS);
         setRatings(MOCK_RATINGS);
       } finally {
@@ -115,34 +168,115 @@ export const useApplicants = () => {
       }
     };
 
-    loadApplicants();
+    fetchApplicantsAndRatings();
   }, []);
 
+  // Add a new applicant to the database
   const addApplicant = async (applicant: Omit<Applicant, "id">) => {
-    // In a real app, this would be an API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('applicants')
+        .insert({
+          user_id: applicant.userId,
+          job_id: applicant.jobId,
+          resume_url: applicant.resumeUrl,
+          application_date: applicant.applicationDate
+        })
+        .select()
+        .single();
 
-    const newApplicant: Applicant = {
-      ...applicant,
-      id: `${applicants.length + 1}`
-    };
+      if (error) {
+        throw error;
+      }
 
-    setApplicants([...applicants, newApplicant]);
-    return newApplicant;
+      // Transform to our Applicant type
+      const newApplicant: Applicant = {
+        id: data.id,
+        userId: data.user_id,
+        jobId: data.job_id,
+        resumeUrl: data.resume_url,
+        applicationDate: data.application_date
+      };
+
+      // Update local state
+      setApplicants((prevApplicants) => [...prevApplicants, newApplicant]);
+      return newApplicant;
+    } catch (error) {
+      console.error("Error adding applicant:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit application",
+        variant: "destructive",
+      });
+      
+      // Fall back to local creation for development
+      const newApplicant: Applicant = {
+        ...applicant,
+        id: `${applicants.length + 1}`
+      };
+      
+      setApplicants([...applicants, newApplicant]);
+      return newApplicant;
+    }
   };
 
+  // Add a rating for an applicant after resume analysis
   const addRating = async (rating: Omit<Rating, "id" | "createdAt">) => {
-    // In a real app, this would be an API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('ratings')
+        .insert({
+          applicant_id: rating.applicantId,
+          criteria_scores: rating.criteriaScores,
+          overall_match_percentage: rating.overallMatchPercentage,
+          skills_match_percentage: rating.skillsMatchPercentage,
+          education_match_percentage: rating.educationMatchPercentage,
+          experience_match_percentage: rating.experienceMatchPercentage,
+          key_phrases: rating.keyPhrases
+        })
+        .select()
+        .single();
 
-    const newRating: Rating = {
-      ...rating,
-      id: `${ratings.length + 1}`,
-      createdAt: new Date().toISOString()
-    };
+      if (error) {
+        throw error;
+      }
 
-    setRatings([...ratings, newRating]);
-    return newRating;
+      // Transform to our Rating type
+      const newRating: Rating = {
+        id: data.id,
+        applicantId: data.applicant_id,
+        criteriaScores: data.criteria_scores,
+        overallMatchPercentage: data.overall_match_percentage,
+        skillsMatchPercentage: data.skills_match_percentage,
+        educationMatchPercentage: data.education_match_percentage,
+        experienceMatchPercentage: data.experience_match_percentage,
+        keyPhrases: data.key_phrases,
+        createdAt: data.created_at
+      };
+
+      // Update local state
+      setRatings((prevRatings) => [...prevRatings, newRating]);
+      return newRating;
+    } catch (error) {
+      console.error("Error adding rating:", error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze application",
+        variant: "destructive",
+      });
+      
+      // Fall back to local creation for development
+      const newRating: Rating = {
+        ...rating,
+        id: `${ratings.length + 1}`,
+        createdAt: new Date().toISOString()
+      };
+      
+      setRatings([...ratings, newRating]);
+      return newRating;
+    }
   };
 
   const getApplicantsByJobId = (jobId: string) => {

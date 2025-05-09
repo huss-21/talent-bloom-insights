@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -20,6 +19,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { ApplicantRatingCharts } from "@/components/ApplicantRatingCharts";
 
 const JobApplicants = () => {
   const { jobId } = useParams();
@@ -65,6 +65,65 @@ const JobApplicants = () => {
       </MainLayout>
     );
   }
+
+  const renderOverviewTab = () => (
+    <TabsContent value="overview" className="space-y-6 mt-6">
+      <div className="flex items-center space-x-4">
+        <div className="h-16 w-16 rounded-full bg-corporate-blue flex items-center justify-center text-white">
+          <User className="h-8 w-8" />
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold">Applicant #{selectedApplicant.id}</h3>
+          <p className="text-sm text-muted-foreground">
+            Applied on {format(new Date(selectedApplicant.applicationDate), "MMMM d, yyyy")}
+          </p>
+        </div>
+      </div>
+      
+      <Separator />
+      
+      {selectedRating ? (
+        <div className="space-y-6">
+          <div>
+            <h4 className="font-medium mb-4">Match Summary</h4>
+            <ApplicantRatingCharts rating={selectedRating} />
+          </div>
+          
+          <div>
+            <h4 className="font-medium mb-4">Skills Analysis</h4>
+            <div className="space-y-4">
+              {Object.entries(selectedRating.criteriaScores).map(([criterion, score]) => (
+                <div key={criterion}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span>{criterion}</span>
+                    <span className={`font-medium ${
+                      score >= 80 ? 'text-green-600' : 
+                      score >= 60 ? 'text-amber-600' : 
+                      'text-red-600'
+                    }`}>
+                      {score}%
+                    </span>
+                  </div>
+                  <Progress value={score} className="h-2" />
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-medium mb-4">Key Matching Phrases</h4>
+            <ul className="list-disc pl-5 space-y-1">
+              {selectedRating.keyPhrases.map((phrase, index) => (
+                <li key={index} className="text-sm">{phrase}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <p className="text-muted-foreground">No rating data available for this applicant.</p>
+      )}
+    </TabsContent>
+  );
 
   return (
     <MainLayout roles={["admin"]}>
@@ -180,18 +239,7 @@ const JobApplicants = () => {
                           <div className="space-y-6">
                             <div>
                               <h4 className="font-medium mb-4">Match Summary</h4>
-                              <div className="flex items-center space-x-4">
-                                <div className={`text-4xl font-bold ${
-                                  selectedRating.overallMatchPercentage >= 80 ? 'text-green-600' : 
-                                  selectedRating.overallMatchPercentage >= 60 ? 'text-amber-600' : 
-                                  'text-red-600'
-                                }`}>
-                                  {selectedRating.overallMatchPercentage}%
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  Overall match score based on job criteria
-                                </div>
-                              </div>
+                              <ApplicantRatingCharts rating={selectedRating} />
                             </div>
                             
                             <div>

@@ -78,13 +78,11 @@ const ResumeUpload = () => {
     try {
       setIsUploading(true);
       
-      // Simulate file upload
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // In a real app, we would upload the file to storage and get a URL
+      // In a real app, we would upload the file to Supabase Storage
+      // For now we'll just simulate it with a URL
       const resumeUrl = `/uploads/${selectedFile.name}`;
       
-      // Create applicant record
+      // Create applicant record in the database
       const newApplicant = await addApplicant({
         userId: currentUser.id,
         jobId: selectedJobId,
@@ -105,16 +103,16 @@ const ResumeUpload = () => {
       const selectedJob = jobOpenings.find(job => job.id === selectedJobId);
       if (!selectedJob) throw new Error("Job not found");
       
-      // Extract text from PDF
+      // Extract text from PDF (would be real in production)
       const resumeText = await extractTextFromPDF(selectedFile);
       
       // Send to LLM API for analysis
       const analysisResult = await analyzeResumeWithOpenAI(resumeText, selectedJob.criteria);
       
-      // Create rating from analysis
+      // Create rating from analysis and store in database
       const ratingData = createRatingFromAnalysis(newApplicant.id, analysisResult);
       
-      // Save rating
+      // Save rating to database
       await addRating(ratingData);
       
       toast({

@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      applicants: {
+        Row: {
+          application_date: string
+          id: string
+          job_id: string
+          resume_url: string
+          user_id: string
+        }
+        Insert: {
+          application_date?: string
+          id?: string
+          job_id: string
+          resume_url: string
+          user_id: string
+        }
+        Update: {
+          application_date?: string
+          id?: string
+          job_id?: string
+          resume_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applicants_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           created_at: string
@@ -41,6 +73,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ratings: {
+        Row: {
+          applicant_id: string
+          created_at: string
+          criteria_scores: Json
+          education_match_percentage: number
+          experience_match_percentage: number
+          id: string
+          key_phrases: string[]
+          overall_match_percentage: number
+          skills_match_percentage: number
+        }
+        Insert: {
+          applicant_id: string
+          created_at?: string
+          criteria_scores?: Json
+          education_match_percentage: number
+          experience_match_percentage: number
+          id?: string
+          key_phrases?: string[]
+          overall_match_percentage: number
+          skills_match_percentage: number
+        }
+        Update: {
+          applicant_id?: string
+          created_at?: string
+          criteria_scores?: Json
+          education_match_percentage?: number
+          experience_match_percentage?: number
+          id?: string
+          key_phrases?: string[]
+          overall_match_percentage?: number
+          skills_match_percentage?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "applicants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

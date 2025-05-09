@@ -29,7 +29,6 @@ const Applicants = () => {
   // Filter applicants based on search query
   const filteredApplicants = applicants.filter(applicant => {
     const job = getJobById(applicant.jobId);
-    const rating = getRatingByApplicantId(applicant.id);
     
     // Search through job title or id
     return job?.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -138,9 +137,7 @@ const Applicants = () => {
                                 <div className="w-20">
                                   <Progress 
                                     value={matchScore} 
-                                    className={`h-2 ${matchScore >= 80 ? 'bg-green-600' : 
-                                              matchScore >= 60 ? 'bg-amber-600' : 
-                                              'bg-red-600'}`}
+                                    className="h-2"
                                   />
                                 </div>
                               </div>
