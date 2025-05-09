@@ -40,6 +40,9 @@ const MOCK_RATINGS: Rating[] = [
       "Communication": 80
     },
     overallMatchPercentage: 82,
+    skillsMatchPercentage: 80,
+    educationMatchPercentage: 85,
+    experienceMatchPercentage: 78,
     keyPhrases: [
       "5 years of React experience",
       "Built multiple enterprise applications",
@@ -59,6 +62,9 @@ const MOCK_RATINGS: Rating[] = [
       "Communication": 75
     },
     overallMatchPercentage: 75,
+    skillsMatchPercentage: 72,
+    educationMatchPercentage: 90,
+    experienceMatchPercentage: 68,
     keyPhrases: [
       "3 years of React development",
       "TypeScript expert",
@@ -78,6 +84,9 @@ const MOCK_RATINGS: Rating[] = [
       "Communication": 70
     },
     overallMatchPercentage: 83,
+    skillsMatchPercentage: 88,
+    educationMatchPercentage: 75,
+    experienceMatchPercentage: 82,
     keyPhrases: [
       "7 years of Node.js development",
       "Designed scalable database systems",

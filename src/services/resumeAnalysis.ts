@@ -28,7 +28,12 @@ export const LLMConfig = {
     system: "You are a resume analyzer that evaluates candidates based on job criteria.",
     user: `
       Analyze this resume against the following criteria. 
-      Provide scores between 0-100 for each criterion and an overall match percentage.
+      Provide scores between 0-100 for each criterion and separately calculate:
+      - Overall match percentage
+      - Skills match percentage (based on technical and soft skills)
+      - Education match percentage (based on academic qualifications)
+      - Experience match percentage (based on relevant work experience)
+      
       Also include 3-5 key phrases from the resume that match the job requirements.
       
       Job Criteria: {jobCriteria}
@@ -40,6 +45,9 @@ export const LLMConfig = {
       {
         "criteriaScores": { "criterion1": score1, "criterion2": score2... },
         "overallMatchPercentage": number,
+        "skillsMatchPercentage": number,
+        "educationMatchPercentage": number,
+        "experienceMatchPercentage": number,
         "keyPhrases": ["phrase1", "phrase2", "phrase3"]
       }
     `,
@@ -68,6 +76,9 @@ export async function extractTextFromPDF(pdfFile: File): Promise<string> {
 export interface ResumeAnalysisResult {
   criteriaScores: Record<string, number>;
   overallMatchPercentage: number;
+  skillsMatchPercentage: number;
+  educationMatchPercentage: number;
+  experienceMatchPercentage: number;
   keyPhrases: string[];
 }
 
@@ -138,6 +149,9 @@ export async function analyzeResumeWithOpenAI(
         Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
       ),
       overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
+      skillsMatchPercentage: Math.floor(Math.random() * 30) + 55,
+      educationMatchPercentage: Math.floor(Math.random() * 30) + 65,
+      experienceMatchPercentage: Math.floor(Math.random() * 30) + 70,
       keyPhrases: [
         "5 years of relevant experience",
         "Led cross-functional teams",
@@ -176,6 +190,9 @@ export async function analyzeResumeWithBedrock(
         Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
       ),
       overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
+      skillsMatchPercentage: Math.floor(Math.random() * 30) + 65,
+      educationMatchPercentage: Math.floor(Math.random() * 30) + 70,
+      experienceMatchPercentage: Math.floor(Math.random() * 30) + 60,
       keyPhrases: [
         "Bachelor's degree in Computer Science",
         "Experience with cloud technologies",
@@ -200,6 +217,9 @@ export function createRatingFromAnalysis(
     applicantId,
     criteriaScores: result.criteriaScores,
     overallMatchPercentage: result.overallMatchPercentage,
+    skillsMatchPercentage: result.skillsMatchPercentage,
+    educationMatchPercentage: result.educationMatchPercentage,
+    experienceMatchPercentage: result.experienceMatchPercentage,
     keyPhrases: result.keyPhrases
   };
 }

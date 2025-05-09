@@ -32,6 +32,9 @@ export interface Rating {
   applicantId: string;
   criteriaScores: Record<string, number>; // e.g. {"Python": 85, "Project Management": 70}
   overallMatchPercentage: number;
+  skillsMatchPercentage: number;
+  educationMatchPercentage: number;
+  experienceMatchPercentage: number;
   keyPhrases: string[];
   createdAt: string;
 }
