@@ -1,4 +1,3 @@
-
 export type Role = "admin" | "applicant";
 
 export interface User {
@@ -42,7 +41,6 @@ export interface Rating {
   overallMatchPercentage: number;
   skillsMatchPercentage: number;
   educationMatchPercentage: number;
-  experienceMatchPercentage: number;
   keyPhrases: string[];
   createdAt: string;
 }
