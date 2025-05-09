@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Applicants = () => {
-  const { applicants, ratings, getRatingByApplicantId } = useApplicants();
+  const { applicants, ratings, getRatingByApplicantId, loading } = useApplicants();
   const { jobOpenings, getJobById } = useJobOpenings();
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -30,9 +31,12 @@ const Applicants = () => {
   const filteredApplicants = applicants.filter(applicant => {
     const job = getJobById(applicant.jobId);
     
-    // Search through job title or id
-    return job?.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           applicant.id.includes(searchQuery);
+    if (!job) return false;
+    
+    // Search through job title, job id, or applicant id
+    return job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           job.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           applicant.id.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   // Get score color class based on rating percentage
@@ -76,13 +80,25 @@ const Applicants = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Applicants ({filteredApplicants.length})</CardTitle>
+            <CardTitle>Applicants ({loading ? "..." : filteredApplicants.length})</CardTitle>
             <CardDescription>
               Review all applicants and their match scores
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {filteredApplicants.length === 0 ? (
+            {loading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-4 w-[160px]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredApplicants.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-muted-foreground">No applicants found</p>
               </div>
@@ -112,7 +128,7 @@ const Applicants = () => {
                               <div className="h-8 w-8 rounded-full bg-corporate-blue-light flex items-center justify-center text-white">
                                 <User className="h-4 w-4" />
                               </div>
-                              <span className="font-medium">Applicant #{applicant.id}</span>
+                              <span className="font-medium">Applicant #{applicant.id.slice(0, 8)}</span>
                             </div>
                           </TableCell>
                           <TableCell>

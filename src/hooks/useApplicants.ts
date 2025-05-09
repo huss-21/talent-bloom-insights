@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -128,6 +129,7 @@ export const useApplicants = () => {
         }));
         
         setApplicants(transformedApplicants);
+        console.log("Fetched applicants:", transformedApplicants);
 
         // Fetch ratings
         const { data: ratingsData, error: ratingsError } = await supabase
@@ -139,19 +141,33 @@ export const useApplicants = () => {
         }
 
         // Transform data to match our Rating type
-        const transformedRatings: Rating[] = ratingsData.map((rating) => ({
-          id: rating.id,
-          applicantId: rating.applicant_id,
-          criteriaScores: rating.criteria_scores as Record<string, number>,
-          overallMatchPercentage: rating.overall_match_percentage,
-          skillsMatchPercentage: rating.skills_match_percentage,
-          educationMatchPercentage: rating.education_match_percentage,
-          experienceMatchPercentage: rating.experience_match_percentage,
-          keyPhrases: rating.key_phrases,
-          createdAt: rating.created_at
-        }));
+        const transformedRatings: Rating[] = ratingsData.map((rating) => {
+          // Ensure criteria_scores is properly converted to Record<string, number>
+          const criteriaScores: Record<string, number> = {};
+          
+          // Handle JSON data from Supabase
+          if (rating.criteria_scores && typeof rating.criteria_scores === 'object') {
+            Object.entries(rating.criteria_scores).forEach(([key, value]) => {
+              // Ensure each value is a number
+              criteriaScores[key] = typeof value === 'number' ? value : 0;
+            });
+          }
+          
+          return {
+            id: rating.id,
+            applicantId: rating.applicant_id,
+            criteriaScores: criteriaScores,
+            overallMatchPercentage: rating.overall_match_percentage,
+            skillsMatchPercentage: rating.skills_match_percentage,
+            educationMatchPercentage: rating.education_match_percentage,
+            experienceMatchPercentage: rating.experience_match_percentage,
+            keyPhrases: Array.isArray(rating.key_phrases) ? rating.key_phrases : [],
+            createdAt: rating.created_at
+          };
+        });
         
         setRatings(transformedRatings);
+        console.log("Fetched ratings:", transformedRatings);
       } catch (error) {
         console.error("Error fetching applicants data:", error);
         toast({
@@ -201,6 +217,7 @@ export const useApplicants = () => {
 
       // Update local state
       setApplicants((prevApplicants) => [...prevApplicants, newApplicant]);
+      console.log("Added new applicant:", newApplicant);
       return newApplicant;
     } catch (error) {
       console.error("Error adding applicant:", error);
@@ -247,7 +264,7 @@ export const useApplicants = () => {
       const newRating: Rating = {
         id: data.id,
         applicantId: data.applicant_id,
-        criteriaScores: data.criteria_scores,
+        criteriaScores: data.criteria_scores as Record<string, number>,
         overallMatchPercentage: data.overall_match_percentage,
         skillsMatchPercentage: data.skills_match_percentage,
         educationMatchPercentage: data.education_match_percentage,
@@ -258,6 +275,7 @@ export const useApplicants = () => {
 
       // Update local state
       setRatings((prevRatings) => [...prevRatings, newRating]);
+      console.log("Added new rating:", newRating);
       return newRating;
     } catch (error) {
       console.error("Error adding rating:", error);
