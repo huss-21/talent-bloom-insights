@@ -38,6 +38,7 @@ export const useJobs = () => {
       }));
 
       setJobs(processedJobs);
+      console.log("Fetched jobs:", processedJobs);
     } catch (error) {
       console.error("Error fetching jobs:", error);
       toast({

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useJobs } from "@/hooks/useJobs";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -26,7 +27,7 @@ const applicationFormSchema = z.object({
 type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 const ResumeUpload = () => {
-  const { jobs, loading: jobsLoading } = useJobs();
+  const { jobs, loading: jobsLoading, refreshJobs } = useJobs();
   const { addApplication, getApplicantsByUserId } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ const ResumeUpload = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isJobLoading, setIsJobLoading] = useState(true);
   
   // Get the jobId from query parameter
   const queryParams = new URLSearchParams(location.search);
@@ -51,27 +53,48 @@ const ResumeUpload = () => {
     mode: "onChange" // Enable validation on change for better UX
   });
   
+  // Make sure to refresh jobs on component mount
+  useEffect(() => {
+    refreshJobs();
+  }, [refreshJobs]);
+  
   // Effect to load the selected job
   useEffect(() => {
-    if (!jobIdFromQuery || !jobs) return;
+    if (!jobIdFromQuery) {
+      setIsJobLoading(false);
+      return;
+    }
+    
+    // Wait for jobs to load before finding the selected job
+    if (jobsLoading) {
+      return;
+    }
+
+    console.log("Looking for job with ID:", jobIdFromQuery);
+    console.log("Available jobs:", jobs);
     
     const job = jobs.find(job => job.id === jobIdFromQuery);
     if (job) {
+      console.log("Found job:", job);
       setSelectedJob(job);
+      setIsJobLoading(false);
     } else {
-      // If job not found, redirect back to jobs page
-      toast({
-        title: "Job not found",
-        description: "The job you're trying to apply for doesn't exist or has been removed.",
-        variant: "destructive",
-      });
-      navigate('/applicant/jobs');
+      console.error("Job not found with ID:", jobIdFromQuery);
+      // Only show the error toast if we've actually finished loading jobs
+      if (!jobsLoading) {
+        toast({
+          title: "Job not found",
+          description: "The job you're trying to apply for doesn't exist or has been removed.",
+          variant: "destructive",
+        });
+        navigate('/applicant/jobs');
+      }
     }
-  }, [jobIdFromQuery, jobs, navigate]);
+  }, [jobIdFromQuery, jobs, navigate, jobsLoading, refreshJobs]);
   
   // Check if user has already applied to this job
   useEffect(() => {
-    if (!currentUser || !jobIdFromQuery) return;
+    if (!currentUser || !jobIdFromQuery || isJobLoading) return;
     
     const userApplications = getApplicantsByUserId(currentUser.id);
     const hasAlreadyApplied = userApplications.some(app => app.jobId === jobIdFromQuery);
@@ -84,7 +107,7 @@ const ResumeUpload = () => {
       });
       navigate('/applicant/jobs');
     }
-  }, [currentUser, jobIdFromQuery, getApplicantsByUserId, navigate]);
+  }, [currentUser, jobIdFromQuery, getApplicantsByUserId, navigate, isJobLoading]);
   
   // Set the name from currentUser when it's available
   useEffect(() => {
@@ -186,28 +209,13 @@ const ResumeUpload = () => {
       
       // Create applicant record in the database
       let userId = currentUser.id;
+      let jobId = selectedJob.id;
       
       // Log the types for debugging
       console.log("User ID type:", typeof userId, "Value:", userId);
       console.log("Job ID type:", typeof selectedJob.id, "Value:", selectedJob.id);
       
-      // Generate UUIDs if the existing IDs are not in UUID format
       try {
-        // Check if the current IDs are valid UUIDs by trying to parse them
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
-          console.log("User ID is not a valid UUID, generating a new one");
-          userId = uuidv4();
-          console.log("Generated UUID for user:", userId);
-        }
-        
-        // Same for job ID
-        let jobId = selectedJob.id;
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
-          console.log("Job ID is not a valid UUID, generating a new one");
-          jobId = uuidv4();
-          console.log("Generated UUID for job:", jobId);
-        }
-      
         const newApplicant = await addApplication({
           userId: userId,
           jobId: jobId,
@@ -233,8 +241,8 @@ const ResumeUpload = () => {
         // Navigate to applications view
         navigate('/applicant/applications');
       } catch (idError: any) {
-        console.error("Error with UUID conversion:", idError);
-        throw new Error(`Invalid ID format: ${idError.message}`);
+        console.error("Error with application creation:", idError);
+        throw new Error(`Application creation error: ${idError.message}`);
       }
       
     } catch (error: any) {
@@ -249,13 +257,45 @@ const ResumeUpload = () => {
     }
   };
   
-  if (jobsLoading || !selectedJob) {
+  if (jobsLoading || isJobLoading) {
     return (
       <MainLayout roles={["applicant"]}>
         <div className="max-w-2xl mx-auto p-4">
           <Card>
             <CardContent className="pt-6">
               <p className="text-center">Loading job details...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+  
+  if (!selectedJob) {
+    return (
+      <MainLayout roles={["applicant"]}>
+        <div className="max-w-2xl mx-auto p-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="bg-red-500 text-white p-4 rounded-md flex items-start">
+                <div className="flex-grow">
+                  <h3 className="font-bold">Job not found</h3>
+                  <p>The job you're trying to apply for doesn't exist or has been removed.</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-white" 
+                  onClick={() => navigate('/applicant/jobs')}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex justify-center mt-4">
+                <Button onClick={() => navigate('/applicant/jobs')}>
+                  Back to Jobs
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
