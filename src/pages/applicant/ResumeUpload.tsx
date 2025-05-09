@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -154,9 +155,11 @@ const ResumeUpload = () => {
       const resumeUrl = publicUrlData.publicUrl;
       console.log("Resume URL:", resumeUrl);
       
+      // Get the selected job to access its description
+      const selectedJob = jobOpenings.find(job => job.id === selectedJobId);
+      const jobDescription = selectedJob ? selectedJob.description : '';
+      
       // Create applicant record in the database
-      // Ensure we're using valid UUIDs for user_id and job_id
-      // If currentUser.id is not a UUID, generate a new one
       let userId = currentUser.id;
       
       // Log the types for debugging
@@ -166,10 +169,8 @@ const ResumeUpload = () => {
       // Generate UUIDs if the existing IDs are not in UUID format
       try {
         // Check if the current IDs are valid UUIDs by trying to parse them
-        // This will throw an error if they're not valid UUIDs
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
           console.log("User ID is not a valid UUID, generating a new one");
-          // Generate a UUID from the user ID - fix the TypeScript error by using proper UUID options
           userId = uuidv4();
           console.log("Generated UUID for user:", userId);
         }
@@ -178,7 +179,6 @@ const ResumeUpload = () => {
         let jobId = selectedJobId;
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
           console.log("Job ID is not a valid UUID, generating a new one");
-          // Generate a UUID for the job ID - fix the TypeScript error
           jobId = uuidv4();
           console.log("Generated UUID for job:", jobId);
         }
@@ -192,7 +192,8 @@ const ResumeUpload = () => {
           nationalId: values.nationalId,
           coverLetter: '',
           resumeFileName: selectedFile.name,
-          resumeFilePath: filePath
+          resumeFilePath: filePath,
+          jobDescription: jobDescription // Include the job description
         });
         
         if (!newApplicant) {

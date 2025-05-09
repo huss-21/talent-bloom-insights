@@ -222,22 +222,28 @@ export const useApplicants = () => {
     coverLetter?: string;
     resumeFileName?: string;
     resumeFilePath?: string;
+    jobDescription?: string;
   }) => {
     try {
       console.log("Submitting application to Supabase:", application);
       
-      // Fetch the job description from the jobs table
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
-        .select('description')
-        .eq('id', application.jobId)
-        .single();
+      // If job description is not provided, try to fetch it
+      let jobDescription = application.jobDescription || '';
       
-      if (jobError) {
-        console.error("Error fetching job description:", jobError);
+      if (!jobDescription) {
+        // Fetch the job description from the jobs table
+        const { data: jobData, error: jobError } = await supabase
+          .from('jobs')
+          .select('description')
+          .eq('id', application.jobId)
+          .single();
+        
+        if (jobError) {
+          console.error("Error fetching job description:", jobError);
+        } else if (jobData) {
+          jobDescription = jobData.description || '';
+        }
       }
-      
-      const jobDescription = jobData?.description || '';
       
       // Insert into Supabase
       const { data, error } = await supabase

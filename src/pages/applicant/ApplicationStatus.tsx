@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -60,7 +59,7 @@ const ApplicationStatus = () => {
   // Split applications into active and archived
   const activeApplications = applicationsWithDetails.filter(app => 
     (app.jobOpening && app.jobOpening.status === "open") || 
-    (app.job && app.job.status === true)
+    (app.job && (typeof app.job.status === "boolean" ? app.job.status : app.job.status === "open"))
   );
   
   const archivedApplications = applicationsWithDetails.filter(app => 
