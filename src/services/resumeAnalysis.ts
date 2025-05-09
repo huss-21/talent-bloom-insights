@@ -8,7 +8,7 @@ import { Rating } from "@/types";
 // Configuration object for LLM settings
 export const LLMConfig = {
   openAI: {
-    apiKey: process.env.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || "",
+    apiKey: localStorage.getItem('openai_api_key') || "",
     model: "gpt-4o",
     setApiKey: (key: string) => {
       localStorage.setItem('openai_api_key', key);
@@ -16,7 +16,7 @@ export const LLMConfig = {
     }
   },
   bedrock: {
-    apiKey: process.env.AWS_BEDROCK_API_KEY || localStorage.getItem('aws_bedrock_api_key') || "",
+    apiKey: localStorage.getItem('aws_bedrock_api_key') || "",
     model: "amazon.titan-text-express-v1",
     setApiKey: (key: string) => {
       localStorage.setItem('aws_bedrock_api_key', key);
