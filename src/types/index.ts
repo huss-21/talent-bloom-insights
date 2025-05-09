@@ -42,6 +42,7 @@ export interface Rating {
   overallMatchPercentage: number;
   skillsMatchPercentage: number;
   educationMatchPercentage: number;
+  experienceMatchPercentage: number;
   keyPhrases: string[];
   createdAt: string;
 }

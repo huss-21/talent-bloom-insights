@@ -149,6 +149,7 @@ export async function analyzeResumeWithOpenAI(
       overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
       skillsMatchPercentage: Math.floor(Math.random() * 30) + 55,
       educationMatchPercentage: Math.floor(Math.random() * 30) + 65,
+      experienceMatchPercentage: Math.floor(Math.random() * 30) + 70,
       keyPhrases: [
         "5 years of relevant experience",
         "Led cross-functional teams",
@@ -189,6 +190,7 @@ export async function analyzeResumeWithBedrock(
       overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
       skillsMatchPercentage: Math.floor(Math.random() * 30) + 65,
       educationMatchPercentage: Math.floor(Math.random() * 30) + 70,
+      experienceMatchPercentage: Math.floor(Math.random() * 30) + 75,
       keyPhrases: [
         "Bachelor's degree in Computer Science",
         "Experience with cloud technologies",
@@ -215,6 +217,7 @@ export function createRatingFromAnalysis(
     overallMatchPercentage: result.overallMatchPercentage,
     skillsMatchPercentage: result.skillsMatchPercentage,
     educationMatchPercentage: result.educationMatchPercentage,
+    experienceMatchPercentage: result.experienceMatchPercentage,
     keyPhrases: result.keyPhrases
   };
 }
