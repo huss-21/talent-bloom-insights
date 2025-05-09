@@ -17,7 +17,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Filter, Calendar, Briefcase, Upload, X, Loader2, RefreshCcw } from "lucide-react";
+import { Search, Filter, Calendar, Briefcase, Upload, X, Loader2, RefreshCcw, AlertTriangle } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Job } from "@/types";
