@@ -85,16 +85,7 @@ const ResumeUpload = () => {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${currentUser.id}/${fileName}`;
       
-      // Check if the resumes bucket exists, create if it doesn't
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const resumesBucketExists = buckets?.some(bucket => bucket.name === 'resumes');
-      
-      if (!resumesBucketExists) {
-        await supabase.storage.createBucket('resumes', {
-          public: false,
-          fileSizeLimit: 5 * 1024 * 1024 // 5MB
-        });
-      }
+      console.log("Uploading resume to:", filePath);
       
       // Upload the file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase
@@ -107,8 +98,11 @@ const ResumeUpload = () => {
         });
       
       if (uploadError) {
+        console.error("Upload error:", uploadError);
         throw new Error(`Error uploading file: ${uploadError.message}`);
       }
+      
+      console.log("Upload successful:", uploadData);
       
       // Get the public URL for the uploaded file
       const { data: publicUrlData } = supabase
@@ -117,6 +111,7 @@ const ResumeUpload = () => {
         .getPublicUrl(filePath);
       
       const resumeUrl = publicUrlData.publicUrl;
+      console.log("Resume URL:", resumeUrl);
       
       // Create applicant record in the database
       const newApplicant = await addApplication({

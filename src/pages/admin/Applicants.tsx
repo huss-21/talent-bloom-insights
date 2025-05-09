@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { format } from "date-fns";
-import { User, FileText, Search, CheckCircle, Clock, XCircle, Download } from "lucide-react";
+import { User, FileText, Search, CheckCircle, Clock, XCircle, Download, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ const Applicants = () => {
   const { jobOpenings, getJobById } = useJobOpenings();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Filter applicants based on search query
   const filteredApplicants = applicants.filter(applicant => {
@@ -189,11 +190,13 @@ const Applicants = () => {
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Applicants ({loading ? "..." : displayedApplicants.length})</CardTitle>
-            <CardDescription>
-              Review all applicants and their match scores
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Applicants ({loading ? "..." : displayedApplicants.length})</CardTitle>
+              <CardDescription>
+                Review all applicants and their match scores
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (

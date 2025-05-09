@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
-// Mock data for applicants
+// Mock data for applicants - keeping these for fallback purposes
 const MOCK_APPLICANTS: Applicant[] = [
   {
     id: "1",
@@ -222,6 +221,8 @@ export const useApplicants = () => {
     resumeFilePath?: string;
   }) => {
     try {
+      console.log("Submitting application to Supabase:", application);
+      
       // Insert into Supabase
       const { data, error } = await supabase
         .from('job_applications')
@@ -239,8 +240,11 @@ export const useApplicants = () => {
         .single();
 
       if (error) {
+        console.error("Error inserting application:", error);
         throw error;
       }
+
+      console.log("Application created successfully:", data);
 
       // Transform to our Applicant type
       const newApplicant: Applicant = {
@@ -259,7 +263,6 @@ export const useApplicants = () => {
 
       // Update local state
       setApplicants((prevApplicants) => [newApplicant, ...prevApplicants]);
-      console.log("Added new application:", newApplicant);
       return newApplicant;
     } catch (error) {
       console.error("Error adding application:", error);
@@ -394,7 +397,10 @@ export const useApplicants = () => {
         .from('resumes')
         .createSignedUrl(filePath, 60); // URL valid for 60 seconds
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating signed URL:", error);
+        throw error;
+      }
       
       return data.signedUrl;
     } catch (error) {
