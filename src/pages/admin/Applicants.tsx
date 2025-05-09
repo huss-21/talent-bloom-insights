@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { format } from "date-fns";
-import { User, FileText, Search } from "lucide-react";
+import { User, FileText, Search, CheckCircle, Clock, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,19 +34,30 @@ const Applicants = () => {
     
     if (!job) return false;
     
-    // Search through job title, job id, or applicant id
-    return job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           job.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           applicant.id.toLowerCase().includes(searchQuery.toLowerCase());
+    // Search through job title, job id, applicant name or email
+    const searchFields = [
+      job.title.toLowerCase(),
+      job.id.toLowerCase(),
+      applicant.id.toLowerCase(),
+      applicant.fullName?.toLowerCase() || '',
+      applicant.email?.toLowerCase() || ''
+    ];
+    
+    return searchFields.some(field => field.includes(searchQuery.toLowerCase()));
   });
 
   // Filter based on active tab
   const displayedApplicants = filteredApplicants.filter(applicant => {
     if (activeTab === "all") return true;
     
-    const rating = getRatingByApplicantId(applicant.id);
-    if (activeTab === "highMatch" && rating) {
-      return rating.overallMatchPercentage >= 80;
+    if (activeTab === "highMatch") {
+      // Check for match score in the applicant or find it in ratings
+      if (applicant.matchScore && applicant.matchScore >= 80) return true;
+      
+      const rating = getRatingByApplicantId(applicant.id);
+      if (rating && rating.overallMatchPercentage >= 80) return true;
+      
+      return false;
     }
     
     if (activeTab === "recent") {
@@ -54,6 +65,10 @@ const Applicants = () => {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       return new Date(applicant.applicationDate) >= oneWeekAgo;
+    }
+
+    if (activeTab === "pending") {
+      return applicant.status === "pending";
     }
     
     return true;
@@ -64,6 +79,33 @@ const Applicants = () => {
     if (score >= 80) return "text-green-600";
     if (score >= 60) return "text-amber-600";
     return "text-red-600";
+  };
+
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "approved":
+        return "success";
+      case "rejected":
+        return "destructive";
+      case "pending":
+        return "warning";
+      default:
+        return "secondary";
+    }
+  };
+
+  // Get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "approved":
+        return <CheckCircle className="h-4 w-4 mr-1" />;
+      case "rejected":
+        return <XCircle className="h-4 w-4 mr-1" />;
+      case "pending":
+      default:
+        return <Clock className="h-4 w-4 mr-1" />;
+    }
   };
 
   return (
@@ -80,7 +122,7 @@ const Applicants = () => {
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by job title or applicant ID..."
+              placeholder="Search by job title, name or email..."
               className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -90,13 +132,14 @@ const Applicants = () => {
           <div className="flex items-center gap-2">
             <Tabs 
               defaultValue="all" 
-              className="w-[320px]"
+              className="w-[400px]"
               value={activeTab}
               onValueChange={setActiveTab}
             >
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="highMatch">High Match</TabsTrigger>
+                <TabsTrigger value="pending">Pending</TabsTrigger>
                 <TabsTrigger value="recent">Recent</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -144,7 +187,7 @@ const Applicants = () => {
                     {displayedApplicants.map((applicant) => {
                       const job = getJobById(applicant.jobId);
                       const rating = getRatingByApplicantId(applicant.id);
-                      const matchScore = rating ? rating.overallMatchPercentage : null;
+                      const matchScore = applicant.matchScore || (rating ? rating.overallMatchPercentage : null);
                       
                       return (
                         <TableRow key={applicant.id}>
@@ -153,7 +196,14 @@ const Applicants = () => {
                               <div className="h-8 w-8 rounded-full bg-corporate-blue-light flex items-center justify-center text-white">
                                 <User className="h-4 w-4" />
                               </div>
-                              <span className="font-medium">Applicant #{applicant.id.slice(0, 8)}</span>
+                              <div>
+                                <span className="font-medium">
+                                  {applicant.fullName || `Applicant #${applicant.id.slice(0, 8)}`}
+                                </span>
+                                {applicant.email && (
+                                  <p className="text-xs text-muted-foreground">{applicant.email}</p>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -187,8 +237,12 @@ const Applicants = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={rating ? "default" : "secondary"}>
-                              {rating ? "Analyzed" : "Pending"}
+                            <Badge 
+                              variant={getStatusBadgeVariant(applicant.status || 'pending')}
+                              className="flex items-center"
+                            >
+                              {getStatusIcon(applicant.status || 'pending')}
+                              {applicant.status || "Pending"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">

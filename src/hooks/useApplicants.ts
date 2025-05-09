@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,34 +109,40 @@ export const useApplicants = () => {
       try {
         setLoading(true);
         
-        // Fetch applicants
-        const { data: applicantsData, error: applicantsError } = await supabase
-          .from('applicants')
+        // 1. Fetch job applications from the new table
+        const { data: applicationsData, error: applicationsError } = await supabase
+          .from('job_applications')
           .select('*')
-          .order('application_date', { ascending: false });
+          .order('applied_at', { ascending: false });
 
-        if (applicantsError) {
-          throw applicantsError;
+        if (applicationsError) {
+          throw applicationsError;
         }
 
-        if (!applicantsData || applicantsData.length === 0) {
-          console.log("No applicants found in database, using mock data");
+        // 2. Transform data to match our Applicant type
+        let transformedApplicants: Applicant[] = [];
+        
+        if (!applicationsData || applicationsData.length === 0) {
+          console.log("No applications found in database, using mock data");
           setApplicants(MOCK_APPLICANTS);
         } else {
-          // Transform data to match our Applicant type
-          const transformedApplicants: Applicant[] = applicantsData.map((app) => ({
+          transformedApplicants = applicationsData.map((app) => ({
             id: app.id,
             userId: app.user_id,
             jobId: app.job_id,
-            resumeUrl: app.resume_url,
-            applicationDate: app.application_date
+            fullName: app.full_name,
+            email: app.email,
+            resumeUrl: app.resume_url || '',
+            applicationDate: app.applied_at,
+            status: app.status,
+            matchScore: app.match_score
           }));
           
           setApplicants(transformedApplicants);
-          console.log("Fetched applicants:", transformedApplicants);
+          console.log("Fetched applications:", transformedApplicants);
         }
 
-        // Fetch ratings
+        // 3. Fetch ratings (keeping the existing code for ratings)
         const { data: ratingsData, error: ratingsError } = await supabase
           .from('ratings')
           .select('*')
@@ -202,17 +207,26 @@ export const useApplicants = () => {
     fetchApplicantsAndRatings();
   }, []);
 
-  // Add a new applicant to the database
-  const addApplicant = async (applicant: Omit<Applicant, "id">) => {
+  // Add a new application to the database
+  const addApplication = async (application: {
+    userId: string;
+    jobId: string;
+    fullName: string;
+    email: string;
+    resumeUrl?: string;
+    coverLetter?: string;
+  }) => {
     try {
       // Insert into Supabase
       const { data, error } = await supabase
-        .from('applicants')
+        .from('job_applications')
         .insert({
-          user_id: applicant.userId,
-          job_id: applicant.jobId,
-          resume_url: applicant.resumeUrl,
-          application_date: applicant.applicationDate
+          user_id: application.userId,
+          job_id: application.jobId,
+          full_name: application.fullName,
+          email: application.email,
+          resume_url: application.resumeUrl || null,
+          cover_letter: application.coverLetter || null,
         })
         .select()
         .single();
@@ -226,30 +240,53 @@ export const useApplicants = () => {
         id: data.id,
         userId: data.user_id,
         jobId: data.job_id,
-        resumeUrl: data.resume_url,
-        applicationDate: data.application_date
+        fullName: data.full_name,
+        email: data.email,
+        resumeUrl: data.resume_url || '',
+        applicationDate: data.applied_at,
+        status: data.status,
+        matchScore: data.match_score
       };
 
       // Update local state
-      setApplicants((prevApplicants) => [...prevApplicants, newApplicant]);
-      console.log("Added new applicant:", newApplicant);
+      setApplicants((prevApplicants) => [newApplicant, ...prevApplicants]);
+      console.log("Added new application:", newApplicant);
       return newApplicant;
     } catch (error) {
-      console.error("Error adding applicant:", error);
+      console.error("Error adding application:", error);
       toast({
         title: "Error",
         description: "Failed to submit application",
         variant: "destructive",
       });
+      throw error;
+    }
+  };
+
+  // Update the status of an application
+  const updateApplicationStatus = async (applicationId: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from('job_applications')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', applicationId);
       
-      // Fall back to local creation for development
-      const newApplicant: Applicant = {
-        ...applicant,
-        id: `${applicants.length + 1}`
-      };
+      if (error) throw error;
       
-      setApplicants([...applicants, newApplicant]);
-      return newApplicant;
+      // Update local state
+      setApplicants(applicants.map(app => 
+        app.id === applicationId ? { ...app, status } : app
+      ));
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating application status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update application status",
+        variant: "destructive",
+      });
+      return false;
     }
   };
 
@@ -328,7 +365,8 @@ export const useApplicants = () => {
     applicants,
     ratings,
     loading,
-    addApplicant,
+    addApplication,
+    updateApplicationStatus,
     addRating,
     getApplicantsByJobId,
     getRatingByApplicantId,
