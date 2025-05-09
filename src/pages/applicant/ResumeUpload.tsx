@@ -28,7 +28,7 @@ const applicationFormSchema = z.object({
 type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 const ResumeUpload = () => {
-  const { jobOpenings } = useJobOpenings();
+  const { jobOpenings, loading: jobsLoading } = useJobOpenings();
   const { addApplication } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -53,7 +53,7 @@ const ResumeUpload = () => {
   });
   
   useEffect(() => {
-    if (jobIdFromQuery) {
+    if (jobIdFromQuery && jobOpenings && jobOpenings.length > 0) {
       const job = jobOpenings.find(job => job.id === jobIdFromQuery);
       if (job) {
         setSelectedJobId(job.id);
@@ -174,8 +174,22 @@ const ResumeUpload = () => {
   };
   
   const selectedJob = selectedJobId 
-    ? jobOpenings.find(job => job.id === selectedJobId) 
+    ? jobOpenings?.find(job => job.id === selectedJobId) 
     : null;
+  
+  if (jobsLoading) {
+    return (
+      <MainLayout roles={["applicant"]}>
+        <div className="max-w-2xl mx-auto p-4">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center">Loading job openings...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout roles={["applicant"]}>
@@ -201,7 +215,7 @@ const ResumeUpload = () => {
                       <SelectValue placeholder="Select a job opening" />
                     </SelectTrigger>
                     <SelectContent>
-                      {jobOpenings
+                      {jobOpenings && jobOpenings
                         .filter(job => job.status === "open")
                         .map(job => (
                           <SelectItem key={job.id} value={job.id}>
