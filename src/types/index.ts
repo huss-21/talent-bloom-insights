@@ -35,3 +35,14 @@ export interface Rating {
   keyPhrases: string[];
   createdAt: string;
 }
+
+export interface Job {
+  id: string;
+  title: string;
+  department: string;
+  description: string;
+  status: boolean;
+  skills_and_requirements: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+}

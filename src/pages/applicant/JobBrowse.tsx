@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { useJobOpenings } from "@/hooks/useJobOpenings";
+import { useJobs } from "@/hooks/useJobs";
 import { useApplicants } from "@/hooks/useApplicants";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,10 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Search, Filter, Calendar, Briefcase, Upload, X } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { JobOpening } from "@/types";
+import { Job } from "@/types";
 
 const JobBrowse = () => {
-  const { jobOpenings } = useJobOpenings();
+  const { jobs, loading } = useJobs();
   const { applicants, getApplicantsByUserId } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ const JobBrowse = () => {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
-  const [selectedJob, setSelectedJob] = useState<JobOpening | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   // Get query parameters
@@ -41,19 +41,19 @@ const JobBrowse = () => {
   // Set selected job from query parameter if available
   React.useEffect(() => {
     if (jobIdFromQuery) {
-      const job = jobOpenings.find(job => job.id === jobIdFromQuery);
+      const job = jobs.find(job => job.id === jobIdFromQuery);
       if (job) {
         setSelectedJob(job);
         setIsDialogOpen(true);
       }
     }
-  }, [jobIdFromQuery, jobOpenings]);
+  }, [jobIdFromQuery, jobs]);
   
   // Get all available departments
-  const departments = Array.from(new Set(jobOpenings.map(job => job.department)));
+  const departments = Array.from(new Set(jobs.map(job => job.department)));
   
   // Filter jobs based on search and department filters
-  const filteredJobs = jobOpenings.filter(job => {
+  const filteredJobs = jobs.filter(job => {
     const matchesSearch = 
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -87,7 +87,7 @@ const JobBrowse = () => {
     setSelectedDepartments([]);
   };
   
-  const viewJobDetails = (job: JobOpening) => {
+  const viewJobDetails = (job: Job) => {
     setSelectedJob(job);
     setIsDialogOpen(true);
     
@@ -159,7 +159,12 @@ const JobBrowse = () => {
         
         {/* Job Listings */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredJobs.length === 0 ? (
+          {loading ? (
+            <div className="col-span-full p-8 text-center">
+              <Briefcase className="mx-auto h-12 w-12 text-muted-foreground animate-pulse" />
+              <h3 className="mt-2 text-lg font-medium">Loading jobs...</h3>
+            </div>
+          ) : filteredJobs.length === 0 ? (
             <div className="col-span-full p-8 text-center">
               <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-2 text-lg font-medium">No job openings found</h3>
@@ -175,15 +180,15 @@ const JobBrowse = () => {
               const hasApplied = hasAppliedToJob(job.id);
               
               return (
-                <Card key={job.id} className={job.status === "closed" ? "opacity-75" : ""}>
+                <Card key={job.id} className={!job.status ? "opacity-75" : ""}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-lg">{job.title}</CardTitle>
                         <CardDescription>{job.department}</CardDescription>
                       </div>
-                      <Badge variant={job.status === "open" ? "default" : "secondary"}>
-                        {job.status}
+                      <Badge variant={job.status ? "default" : "secondary"}>
+                        {job.status ? "Open" : "Closed"}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -194,19 +199,19 @@ const JobBrowse = () => {
                     
                     <div className="flex items-center space-x-2 text-sm mb-4">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Posted {format(new Date(job.createdAt), "MMM d, yyyy")}</span>
+                      <span>Posted {format(new Date(job.created_at), "MMM d, yyyy")}</span>
                     </div>
                     
                     <div>
                       <h4 className="text-sm font-medium mb-2">Key Skills Required:</h4>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(job.criteria).slice(0, 3).map(([name, weight]) => (
+                        {Object.entries(job.skills_and_requirements).slice(0, 3).map(([name, weight]) => (
                           <Badge key={name} variant="outline" className="bg-corporate-gray-100">
                             {name}
                           </Badge>
                         ))}
-                        {Object.keys(job.criteria).length > 3 && (
-                          <Badge variant="outline">+{Object.keys(job.criteria).length - 3} more</Badge>
+                        {Object.keys(job.skills_and_requirements).length > 3 && (
+                          <Badge variant="outline">+{Object.keys(job.skills_and_requirements).length - 3} more</Badge>
                         )}
                       </div>
                     </div>
@@ -222,12 +227,12 @@ const JobBrowse = () => {
                     
                     <Button
                       className="w-full bg-corporate-blue hover:bg-corporate-blue-light"
-                      disabled={job.status === "closed" || hasApplied}
+                      disabled={!job.status || hasApplied}
                       onClick={() => applyForJob(job.id)}
                     >
                       {hasApplied ? (
                         "Already Applied"
-                      ) : job.status === "closed" ? (
+                      ) : !job.status ? (
                         "Position Closed"
                       ) : (
                         <>
@@ -258,11 +263,11 @@ const JobBrowse = () => {
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">
-                      Posted {format(new Date(selectedJob.createdAt), "MMMM d, yyyy")}
+                      Posted {format(new Date(selectedJob.created_at), "MMMM d, yyyy")}
                     </span>
                   </div>
-                  <Badge variant={selectedJob.status === "open" ? "default" : "secondary"}>
-                    {selectedJob.status}
+                  <Badge variant={selectedJob.status ? "default" : "secondary"}>
+                    {selectedJob.status ? "Open" : "Closed"}
                   </Badge>
                 </div>
                 
@@ -274,10 +279,10 @@ const JobBrowse = () => {
                 <div className="space-y-2">
                   <h4 className="font-medium">Skills & Requirements</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(selectedJob.criteria).map(([name, weight]) => (
+                    {Object.entries(selectedJob.skills_and_requirements).map(([name, weight]) => (
                       <div key={name} className="flex justify-between items-center text-sm p-2 border rounded-md">
                         <span>{name}</span>
-                        <Badge>{weight}%</Badge>
+                        <Badge>{typeof weight === 'number' ? `${weight}%` : weight}</Badge>
                       </div>
                     ))}
                   </div>
@@ -290,12 +295,12 @@ const JobBrowse = () => {
                 </Button>
                 <Button
                   className="bg-corporate-blue hover:bg-corporate-blue-light"
-                  disabled={selectedJob.status === "closed" || hasAppliedToJob(selectedJob.id)}
+                  disabled={!selectedJob.status || hasAppliedToJob(selectedJob.id)}
                   onClick={() => applyForJob(selectedJob.id)}
                 >
                   {hasAppliedToJob(selectedJob.id) ? (
                     "Already Applied"
-                  ) : selectedJob.status === "closed" ? (
+                  ) : !selectedJob.status ? (
                     "Position Closed"
                   ) : (
                     "Apply Now"
