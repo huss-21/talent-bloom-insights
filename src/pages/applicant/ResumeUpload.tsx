@@ -9,11 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Upload, CheckCircle, X, AlertTriangle, FileText } from "lucide-react";
+import { Upload, CheckCircle, X, AlertTriangle, FileText, User, IdCard } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const applicationFormSchema = z.object({
+  fullName: z.string().min(2, "Name must be at least 2 characters"),
+  nationalId: z.string().min(3, "National ID is required"),
+});
+
+type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 const ResumeUpload = () => {
   const { jobOpenings } = useJobOpenings();
@@ -25,12 +37,20 @@ const ResumeUpload = () => {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Get the jobId from query parameter if available
   const queryParams = new URLSearchParams(location.search);
   const jobIdFromQuery = queryParams.get('jobId');
+  
+  // Initialize form with default values
+  const form = useForm<ApplicationFormValues>({
+    resolver: zodResolver(applicationFormSchema),
+    defaultValues: {
+      fullName: currentUser?.name || "",
+      nationalId: "",
+    },
+  });
   
   useEffect(() => {
     if (jobIdFromQuery) {
@@ -39,7 +59,12 @@ const ResumeUpload = () => {
         setSelectedJobId(job.id);
       }
     }
-  }, [jobIdFromQuery, jobOpenings]);
+    
+    // Set the name from currentUser when it's available
+    if (currentUser?.name) {
+      form.setValue("fullName", currentUser.name);
+    }
+  }, [jobIdFromQuery, jobOpenings, currentUser, form]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,9 +90,7 @@ const ResumeUpload = () => {
     setErrorMessage(null);
   };
   
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
+  const onSubmit = async (values: ApplicationFormValues) => {
     if (!selectedJobId || !selectedFile || !currentUser) {
       toast({
         title: "Validation Error",
@@ -117,9 +140,10 @@ const ResumeUpload = () => {
       const newApplicant = await addApplication({
         userId: currentUser.id,
         jobId: selectedJobId,
-        fullName: currentUser.name || 'Unnamed User',
+        fullName: values.fullName,
         email: currentUser.email,
         resumeUrl,
+        nationalId: values.nationalId,
         coverLetter: '',
         resumeFileName: selectedFile.name,
         resumeFilePath: filePath
@@ -146,7 +170,6 @@ const ResumeUpload = () => {
       });
     } finally {
       setIsUploading(false);
-      setIsAnalyzing(false);
     }
   };
   
@@ -160,143 +183,182 @@ const ResumeUpload = () => {
         <h1 className="text-3xl font-bold tracking-tight mb-6">Upload Your Resume</h1>
         
         <Card>
-          <form onSubmit={handleSubmit}>
-            <CardHeader>
-              <CardTitle>Resume Upload</CardTitle>
-              <CardDescription>
-                Upload your resume to apply for a position
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-              {/* Job Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="job">Select Position</Label>
-                <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                  <SelectTrigger id="job">
-                    <SelectValue placeholder="Select a job opening" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobOpenings
-                      .filter(job => job.status === "open")
-                      .map(job => (
-                        <SelectItem key={job.id} value={job.id}>
-                          {job.title} - {job.department}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <CardHeader>
+                <CardTitle>Resume Upload</CardTitle>
+                <CardDescription>
+                  Upload your resume to apply for a position
+                </CardDescription>
+              </CardHeader>
               
-              {/* Selected Job Info */}
-              {selectedJob && (
-                <div className="p-4 border rounded-md bg-muted/50">
-                  <h3 className="font-medium mb-1">{selectedJob.title}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{selectedJob.department}</p>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(selectedJob.criteria || {}).map(([name, weight]) => (
-                        <Badge key={name} variant="outline" className="bg-corporate-gray-100">
-                          {name}: {typeof weight === 'number' ? `${weight}%` : String(weight)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* File Upload */}
-              <div className="space-y-2">
-                <Label htmlFor="resume">Upload Resume (PDF only, max 5MB)</Label>
-                <div className="border-2 border-dashed rounded-md px-6 py-8">
-                  <div className="flex flex-col items-center">
-                    {selectedFile ? (
-                      <div className="flex flex-col items-center">
-                        <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
-                        <p className="font-medium">{selectedFile.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="mt-2"
-                          onClick={() => setSelectedFile(null)}
-                        >
-                          <X className="h-4 w-4 mr-1" /> Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <FileText className="h-10 w-10 text-muted-foreground mb-2" />
-                        <p className="mb-1 text-sm font-medium">Drag and drop your resume, or click to browse</p>
-                        <p className="text-xs text-muted-foreground mb-4">PDF format only, max 5MB</p>
-                        
-                        <input
-                          id="resume"
-                          type="file"
-                          className="hidden"
-                          accept=".pdf"
-                          onChange={handleFileChange}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => document.getElementById('resume')?.click()}
-                        >
-                          <Upload className="mr-2 h-4 w-4" /> Browse Files
-                        </Button>
-                      </>
-                    )}
-                  </div>
+              <CardContent className="space-y-6">
+                {/* Job Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="job">Select Position</Label>
+                  <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                    <SelectTrigger id="job">
+                      <SelectValue placeholder="Select a job opening" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobOpenings
+                        .filter(job => job.status === "open")
+                        .map(job => (
+                          <SelectItem key={job.id} value={job.id}>
+                            {job.title} - {job.department}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                {errorMessage && (
-                  <div className="flex items-center text-red-600 text-sm mt-1">
-                    <AlertTriangle className="h-4 w-4 mr-1" /> {errorMessage}
+                {/* Selected Job Info */}
+                {selectedJob && (
+                  <div className="p-4 border rounded-md bg-muted/50">
+                    <h3 className="font-medium mb-1">{selectedJob.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-3">{selectedJob.department}</p>
+                    
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Key Skills Required:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(selectedJob.criteria || {}).map(([name, weight]) => (
+                          <Badge key={name} variant="outline" className="bg-corporate-gray-100">
+                            {name}: {typeof weight === 'number' ? `${weight}%` : String(weight)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
+                
+                {/* Personal Information */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <div className="flex">
+                            <User className="mr-2 h-4 w-4 opacity-70 self-center" />
+                            <Input placeholder="Enter your full name" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="nationalId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>National ID</FormLabel>
+                        <FormControl>
+                          <div className="flex">
+                            <IdCard className="mr-2 h-4 w-4 opacity-70 self-center" />
+                            <Input placeholder="Enter your National ID" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                {/* File Upload */}
+                <div className="space-y-2">
+                  <Label htmlFor="resume">Upload Resume (PDF only, max 5MB)</Label>
+                  <div className="border-2 border-dashed rounded-md px-6 py-8">
+                    <div className="flex flex-col items-center">
+                      {selectedFile ? (
+                        <div className="flex flex-col items-center">
+                          <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
+                          <p className="font-medium">{selectedFile.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={() => setSelectedFile(null)}
+                          >
+                            <X className="h-4 w-4 mr-1" /> Remove
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <FileText className="h-10 w-10 text-muted-foreground mb-2" />
+                          <p className="mb-1 text-sm font-medium">Drag and drop your resume, or click to browse</p>
+                          <p className="text-xs text-muted-foreground mb-4">PDF format only, max 5MB</p>
+                          
+                          <input
+                            id="resume"
+                            type="file"
+                            className="hidden"
+                            accept=".pdf"
+                            onChange={handleFileChange}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => document.getElementById('resume')?.click()}
+                          >
+                            <Upload className="mr-2 h-4 w-4" /> Browse Files
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {errorMessage && (
+                    <div className="flex items-center text-red-600 text-sm mt-1">
+                      <AlertTriangle className="h-4 w-4 mr-1" /> {errorMessage}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Process Description */}
+                <div className="p-4 bg-blue-50 rounded-md">
+                  <h4 className="font-medium mb-2 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> What happens next?
+                  </h4>
+                  <ul className="space-y-1 text-sm">
+                    <li>1. Your resume will be uploaded and stored securely</li>
+                    <li>2. Hiring managers will be notified of your application</li>
+                    <li>3. You can track the status of your application in your dashboard</li>
+                  </ul>
+                </div>
+              </CardContent>
               
-              {/* Process Description */}
-              <div className="p-4 bg-blue-50 rounded-md">
-                <h4 className="font-medium mb-2 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> What happens next?
-                </h4>
-                <ul className="space-y-1 text-sm">
-                  <li>1. Your resume will be uploaded and stored securely</li>
-                  <li>2. Hiring managers will be notified of your application</li>
-                  <li>3. You can track the status of your application in your dashboard</li>
-                </ul>
-              </div>
-            </CardContent>
-            
-            <CardFooter className="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/applicant/jobs')}
-                disabled={isUploading}
-              >
-                Cancel
-              </Button>
-              
-              <Button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!selectedJobId || !selectedFile || isUploading}
-              >
-                {isUploading ? (
-                  <>Uploading...</>
-                ) : (
-                  <>Submit Application</>
-                )}
-              </Button>
-            </CardFooter>
-          </form>
+              <CardFooter className="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/applicant/jobs')}
+                  disabled={isUploading}
+                >
+                  Cancel
+                </Button>
+                
+                <Button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={!selectedJobId || !selectedFile || isUploading || !form.formState.isValid}
+                >
+                  {isUploading ? (
+                    <>Uploading...</>
+                  ) : (
+                    <>Submit Application</>
+                  )}
+                </Button>
+              </CardFooter>
+            </form>
+          </Form>
         </Card>
       </div>
     </MainLayout>

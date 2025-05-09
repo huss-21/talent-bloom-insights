@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 // Mock data for applicants - keeping these for fallback purposes
 const MOCK_APPLICANTS: Applicant[] = [
@@ -132,6 +132,7 @@ export const useApplicants = () => {
             jobId: app.job_id,
             fullName: app.full_name,
             email: app.email,
+            nationalId: app.national_id || '',
             resumeUrl: app.resume_url || '',
             resumeFileName: app.resume_file_name || '',
             resumeFilePath: app.resume_file_path || '',
@@ -215,6 +216,7 @@ export const useApplicants = () => {
     jobId: string;
     fullName: string;
     email: string;
+    nationalId?: string;
     resumeUrl?: string;
     coverLetter?: string;
     resumeFileName?: string;
@@ -231,6 +233,7 @@ export const useApplicants = () => {
           job_id: application.jobId,
           full_name: application.fullName,
           email: application.email,
+          national_id: application.nationalId || null,
           resume_url: application.resumeUrl || null,
           cover_letter: application.coverLetter || null,
           resume_file_name: application.resumeFileName || null,
@@ -253,6 +256,7 @@ export const useApplicants = () => {
         jobId: data.job_id,
         fullName: data.full_name,
         email: data.email,
+        nationalId: data.national_id || '',
         resumeUrl: data.resume_url || '',
         resumeFileName: data.resume_file_name || '',
         resumeFilePath: data.resume_file_path || '',

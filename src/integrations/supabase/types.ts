@@ -50,6 +50,7 @@ export type Database = {
           id: string
           job_id: string
           match_score: number | null
+          national_id: string | null
           resume_file_name: string | null
           resume_file_path: string | null
           resume_url: string | null
@@ -65,6 +66,7 @@ export type Database = {
           id?: string
           job_id: string
           match_score?: number | null
+          national_id?: string | null
           resume_file_name?: string | null
           resume_file_path?: string | null
           resume_url?: string | null
@@ -80,6 +82,7 @@ export type Database = {
           id?: string
           job_id?: string
           match_score?: number | null
+          national_id?: string | null
           resume_file_name?: string | null
           resume_file_path?: string | null
           resume_url?: string | null
