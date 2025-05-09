@@ -56,6 +56,7 @@ export const useJobs = () => {
 
   const addJob = async (job: Omit<Job, "id" | "created_at" | "updated_at">) => {
     try {
+      console.log("Adding job to Supabase:", job);
       const { data, error } = await supabase
         .from('jobs')
         .insert([job])
@@ -63,6 +64,7 @@ export const useJobs = () => {
         .single();
 
       if (error) {
+        console.error("Supabase error:", error);
         toast({
           title: "Error",
           description: "Failed to add job. " + error.message,

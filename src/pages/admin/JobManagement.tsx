@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useJobs } from "@/hooks/useJobs";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -26,7 +27,7 @@ interface CriterionInput {
 }
 
 const JobManagement = () => {
-  const { jobs, loading, addJob, updateJobStatus } = useJobs();
+  const { jobs, loading, addJob, updateJobStatus, refreshJobs } = useJobs();
   const { getApplicantsByJobId } = useApplicants();
   const [isOpen, setIsOpen] = useState(false);
   
@@ -49,7 +50,7 @@ const JobManagement = () => {
     });
     
     try {
-      await addJob({
+      console.log("Submitting job to Supabase:", {
         title: data.title,
         description: data.description,
         department: data.department,
@@ -57,12 +58,24 @@ const JobManagement = () => {
         status: data.status
       });
       
-      toast({
-        title: "Job Opening Created",
-        description: "The job opening has been successfully created."
+      const result = await addJob({
+        title: data.title,
+        description: data.description,
+        department: data.department,
+        skills_and_requirements: skillsAndRequirements,
+        status: data.status
       });
       
-      setIsOpen(false);
+      if (result) {
+        toast({
+          title: "Job Opening Created",
+          description: "The job opening has been successfully created."
+        });
+        
+        // Refresh the jobs list to ensure we're displaying the latest data
+        refreshJobs();
+        setIsOpen(false);
+      }
     } catch (error) {
       toast({
         title: "Error",
