@@ -1,3 +1,4 @@
+
 export interface Applicant {
   id: string;
   userId: string;

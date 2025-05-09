@@ -25,6 +25,10 @@ export interface Applicant {
   jobId: string;
   resumeUrl: string;
   applicationDate: string;
+  fullName?: string;
+  email?: string;
+  status?: string;
+  matchScore?: number | null;
 }
 
 export interface Rating {

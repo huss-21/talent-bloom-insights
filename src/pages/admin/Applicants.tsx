@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -85,13 +84,13 @@ const Applicants = () => {
   const getStatusBadgeVariant = (status: string) => {
     switch (status?.toLowerCase()) {
       case "approved":
-        return "success";
+        return "default";
       case "rejected":
         return "destructive";
       case "pending":
-        return "warning";
-      default:
         return "secondary";
+      default:
+        return "outline";
     }
   };
 

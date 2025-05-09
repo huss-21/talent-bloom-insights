@@ -15,7 +15,7 @@ import { extractTextFromPDF, analyzeResumeWithOpenAI, createRatingFromAnalysis }
 
 const ResumeUpload = () => {
   const { jobOpenings } = useJobOpenings();
-  const { addApplicant, addRating } = useApplicants();
+  const { addApplication, addRating } = useApplicants();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -83,11 +83,13 @@ const ResumeUpload = () => {
       const resumeUrl = `/uploads/${selectedFile.name}`;
       
       // Create applicant record in the database
-      const newApplicant = await addApplicant({
+      const newApplicant = await addApplication({
         userId: currentUser.id,
         jobId: selectedJobId,
+        fullName: currentUser.name || 'Unnamed User',
+        email: currentUser.email,
         resumeUrl,
-        applicationDate: new Date().toISOString()
+        coverLetter: ''
       });
       
       toast({
