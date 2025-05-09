@@ -40,6 +40,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          job_description: string | null
           job_id: string
           match_score: number | null
           national_id: string | null
@@ -56,6 +57,7 @@ export type Database = {
           email: string
           full_name: string
           id?: string
+          job_description?: string | null
           job_id: string
           match_score?: number | null
           national_id?: string | null
@@ -72,6 +74,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          job_description?: string | null
           job_id?: string
           match_score?: number | null
           national_id?: string | null

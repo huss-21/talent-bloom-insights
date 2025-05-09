@@ -1,3 +1,4 @@
+
 export type Role = "admin" | "applicant";
 
 export interface User {
@@ -31,6 +32,7 @@ export interface Applicant {
   resumeFileName?: string;
   resumeFilePath?: string;
   nationalId?: string;
+  jobDescription?: string;
 }
 
 export interface Rating {

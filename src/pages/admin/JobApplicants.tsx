@@ -109,7 +109,7 @@ const JobApplicants = () => {
           <User className="h-8 w-8" />
         </div>
         <div>
-          <h3 className="text-xl font-semibold">Applicant #{selectedApplicant.id}</h3>
+          <h3 className="text-xl font-semibold">{selectedApplicant.fullName || `Applicant #${selectedApplicant.id.slice(0, 8)}`}</h3>
           <p className="text-sm text-muted-foreground">
             Applied on {format(new Date(selectedApplicant.applicationDate), "MMMM d, yyyy")}
           </p>
@@ -117,6 +117,17 @@ const JobApplicants = () => {
       </div>
       
       <Separator />
+      
+      {/* Added job description display section */}
+      {selectedApplicant.jobDescription && (
+        <div>
+          <h4 className="font-medium mb-2">Job Description</h4>
+          <div className="p-4 bg-muted/50 rounded-md">
+            <p className="text-sm whitespace-pre-wrap">{selectedApplicant.jobDescription}</p>
+          </div>
+          <Separator className="my-4" />
+        </div>
+      )}
       
       {selectedRating ? (
         <div className="space-y-6">
@@ -270,6 +281,17 @@ const JobApplicants = () => {
                         </div>
                         
                         <Separator />
+                        
+                        {/* Added job description display section */}
+                        {selectedApplicant.jobDescription && (
+                          <div>
+                            <h4 className="font-medium mb-2">Job Description</h4>
+                            <div className="p-4 bg-muted/50 rounded-md">
+                              <p className="text-sm whitespace-pre-wrap">{selectedApplicant.jobDescription}</p>
+                            </div>
+                            <Separator className="my-4" />
+                          </div>
+                        )}
                         
                         {selectedRating ? (
                           <div className="space-y-6">

@@ -138,7 +138,8 @@ export const useApplicants = () => {
             resumeFilePath: app.resume_file_path || '',
             applicationDate: app.applied_at,
             status: app.status,
-            matchScore: app.match_score
+            matchScore: app.match_score,
+            jobDescription: app.job_description || ''
           }));
           
           setApplicants(transformedApplicants);
@@ -225,6 +226,19 @@ export const useApplicants = () => {
     try {
       console.log("Submitting application to Supabase:", application);
       
+      // Fetch the job description from the jobs table
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select('description')
+        .eq('id', application.jobId)
+        .single();
+      
+      if (jobError) {
+        console.error("Error fetching job description:", jobError);
+      }
+      
+      const jobDescription = jobData?.description || '';
+      
       // Insert into Supabase
       const { data, error } = await supabase
         .from('job_applications')
@@ -238,6 +252,7 @@ export const useApplicants = () => {
           cover_letter: application.coverLetter || null,
           resume_file_name: application.resumeFileName || null,
           resume_file_path: application.resumeFilePath || null,
+          job_description: jobDescription // Store the job description
         })
         .select()
         .single();
@@ -262,7 +277,8 @@ export const useApplicants = () => {
         resumeFilePath: data.resume_file_path || '',
         applicationDate: data.applied_at,
         status: data.status,
-        matchScore: data.match_score
+        matchScore: data.match_score,
+        jobDescription: data.job_description || ''
       };
 
       // Update local state
