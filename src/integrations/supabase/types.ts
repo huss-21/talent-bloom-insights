@@ -31,15 +31,7 @@ export type Database = {
           resume_url?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "applicants_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       job_applications: {
         Row: {
@@ -90,15 +82,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "job_applications_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       jobs: {
         Row: {
@@ -167,15 +151,7 @@ export type Database = {
           overall_match_percentage?: number
           skills_match_percentage?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "ratings_applicant_id_fkey"
-            columns: ["applicant_id"]
-            isOneToOne: false
-            referencedRelation: "applicants"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
