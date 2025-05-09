@@ -57,15 +57,31 @@ const ApplicationStatus = () => {
   });
   
   // Split applications into active and archived
-  const activeApplications = applicationsWithDetails.filter(app => 
-    (app.jobOpening && app.jobOpening.status === "open") || 
-    (app.job && (typeof app.job.status === "boolean" ? app.job.status : app.job.status === "open"))
-  );
+  const activeApplications = applicationsWithDetails.filter(app => {
+    // Properly handle both string and boolean status types
+    if (app.jobOpening && app.jobOpening.status === "open") {
+      return true;
+    }
+    
+    if (app.job) {
+      return app.job.status === true;
+    }
+    
+    return false;
+  });
   
-  const archivedApplications = applicationsWithDetails.filter(app => 
-    (app.jobOpening && app.jobOpening.status === "closed") || 
-    (app.job && app.job.status === false)
-  );
+  const archivedApplications = applicationsWithDetails.filter(app => {
+    // Properly handle both string and boolean status types
+    if (app.jobOpening && app.jobOpening.status === "closed") {
+      return true;
+    }
+    
+    if (app.job) {
+      return app.job.status === false;
+    }
+    
+    return false;
+  });
   
   return (
     <MainLayout roles={["applicant"]}>
@@ -196,7 +212,11 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, getResum
   // Get the job title and department from the appropriate object
   const jobTitle = application.jobOpening ? application.jobOpening.title : application.job?.title;
   const jobDepartment = application.jobOpening ? application.jobOpening.department : application.job?.department;
-  const jobStatus = application.jobOpening ? application.jobOpening.status : (application.job?.status ? "open" : "closed");
+  
+  // Fix the job status handling to properly work with both string and boolean types
+  const jobStatus = application.jobOpening 
+    ? application.jobOpening.status 
+    : (application.job?.status ? "open" : "closed");
   
   // Helper function to get the appropriate color class based on score
   const getScoreColorClass = (score: number) => {
