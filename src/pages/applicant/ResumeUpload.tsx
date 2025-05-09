@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Upload, CheckCircle, X, AlertTriangle, FileText, User, IdCard } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
