@@ -1,148 +1,156 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { JobOpening } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
-// Mock data for job openings
 const MOCK_JOB_OPENINGS: JobOpening[] = [
   {
     id: "1",
     title: "Frontend Developer",
-    description: "We are looking for an experienced Frontend Developer proficient in React, TypeScript, and modern CSS frameworks.",
+    description: "We are seeking a skilled frontend developer with experience in React, TypeScript, and modern CSS frameworks.",
     department: "Engineering",
     criteria: {
-      "React": 35,
-      "TypeScript": 25,
-      "CSS": 20,
-      "Testing": 10,
-      "Communication": 10
+      "React": 80,
+      "TypeScript": 70,
+      "CSS": 60,
+      "Testing": 50,
+      "Communication": 40
     },
     status: "open",
     createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()  // 2 days ago
+    updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days ago
   },
   {
     id: "2",
     title: "Backend Engineer",
-    description: "Looking for a backend developer with strong experience in Node.js, database design, and API development.",
+    description: "Looking for a backend engineer with strong skills in API development, database design, and Node.js.",
     department: "Engineering",
     criteria: {
-      "Node.js": 30,
-      "Database Design": 25,
-      "API Development": 25,
-      "Problem Solving": 10,
-      "Communication": 10
-    },
-    status: "open",
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
-    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()  // 5 days ago
-  },
-  {
-    id: "3",
-    title: "UX Designer",
-    description: "We need a creative UX Designer with experience in user research, wireframing, and prototyping.",
-    department: "Design",
-    criteria: {
-      "User Research": 30,
-      "Wireframing": 25,
-      "Prototyping": 25,
-      "Visual Design": 10,
-      "Communication": 10
-    },
-    status: "open",
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()  // 3 days ago
-  },
-  {
-    id: "4",
-    title: "Project Manager",
-    description: "Seeking an experienced Project Manager to lead cross-functional teams and deliver complex projects.",
-    department: "Operations",
-    criteria: {
-      "Project Planning": 25,
-      "Team Leadership": 25,
-      "Risk Management": 20,
-      "Stakeholder Management": 20,
-      "Communication": 10
-    },
-    status: "closed",
-    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
-    updatedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()  // 15 days ago
-  },
-  {
-    id: "5",
-    title: "Data Scientist",
-    description: "Looking for a Data Scientist with strong statistical analysis and machine learning skills.",
-    department: "Data",
-    criteria: {
-      "Python": 25,
-      "Statistical Analysis": 25,
-      "Machine Learning": 25,
-      "Data Visualization": 15,
-      "Communication": 10
+      "Node.js": 80,
+      "Database Design": 70,
+      "API Development": 60,
+      "Problem Solving": 50,
+      "Communication": 40
     },
     status: "open",
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()  // 1 day ago
+    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() // 5 days ago
+  },
+  {
+    id: "3",
+    title: "UX/UI Designer",
+    description: "Seeking a talented UX/UI designer to create intuitive and engaging user experiences for our web and mobile applications.",
+    department: "Design",
+    criteria: {
+      "UI Design": 80,
+      "UX Research": 70,
+      "Prototyping": 60,
+      "Visual Design": 50,
+      "Communication": 40
+    },
+    status: "closed",
+    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), // 20 days ago
+    updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() // 10 days ago
   }
 ];
 
 export const useJobOpenings = () => {
   const [jobOpenings, setJobOpenings] = useState<JobOpening[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    // In a real app, this would be an API call
-    const loadJobs = async () => {
-      try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setJobOpenings(MOCK_JOB_OPENINGS);
-      } finally {
-        setLoading(false);
+  // Fetch job openings from Supabase
+  const fetchJobOpenings = useCallback(async () => {
+    try {
+      console.log("Fetching job openings...");
+      setLoading(true);
+      setError(null);
+      
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
       }
-    };
 
-    loadJobs();
+      if (data) {
+        console.log("Fetched job openings:", data);
+        
+        // Transform data to match our JobOpening type
+        const transformedJobs: JobOpening[] = data.map(job => ({
+          id: job.id,
+          title: job.title,
+          description: job.description,
+          department: job.department,
+          criteria: typeof job.skills_and_requirements === 'object' 
+            ? job.skills_and_requirements 
+            : {},
+          status: job.status ? "open" : "closed",
+          createdAt: job.created_at,
+          updatedAt: job.updated_at
+        }));
+        
+        setJobOpenings(transformedJobs);
+      } else {
+        console.log("No job data found, using mock data");
+        setJobOpenings(MOCK_JOB_OPENINGS);
+      }
+    } catch (error) {
+      console.error("Error fetching job openings:", error);
+      setError(error as Error);
+      
+      // Use mock data as fallback
+      console.log("Using mock job opening data due to error");
+      setJobOpenings(MOCK_JOB_OPENINGS);
+      
+      toast({
+        title: "Error loading jobs",
+        description: "Failed to load job openings. Using sample data instead.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const addJob = async (job: Omit<JobOpening, "id" | "createdAt" | "updatedAt">) => {
-    // In a real app, this would be an API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  useEffect(() => {
+    fetchJobOpenings();
+    
+    // Set up a retry mechanism for network issues
+    const retryInterval = setInterval(() => {
+      if (error) {
+        console.log("Retrying job openings fetch due to previous error");
+        fetchJobOpenings();
+      }
+    }, 30000); // Retry every 30 seconds if there was an error
+    
+    return () => clearInterval(retryInterval);
+  }, [fetchJobOpenings, error]);
 
-    const now = new Date().toISOString();
-    const newJob: JobOpening = {
-      ...job,
-      id: `${jobOpenings.length + 1}`,
-      createdAt: now,
-      updatedAt: now
-    };
-
-    setJobOpenings([...jobOpenings, newJob]);
-    return newJob;
+  // Get a single job opening by id
+  const getJobById = (id: string): JobOpening | undefined => {
+    return jobOpenings.find(job => job.id === id);
   };
 
-  const updateJobStatus = async (id: string, status: "open" | "closed") => {
-    // In a real app, this would be an API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    setJobOpenings(
-      jobOpenings.map(job => 
-        job.id === id 
-          ? { ...job, status, updatedAt: new Date().toISOString() } 
-          : job
-      )
-    );
+  // Get all open job openings
+  const getOpenJobs = (): JobOpening[] => {
+    return jobOpenings.filter(job => job.status === "open");
   };
 
-  const getJobById = (id: string) => {
-    return jobOpenings.find(job => job.id === id) || null;
+  // Refresh job openings data
+  const refreshJobs = async () => {
+    await fetchJobOpenings();
   };
 
   return {
     jobOpenings,
     loading,
-    addJob,
-    updateJobStatus,
-    getJobById
+    error,
+    getJobById,
+    getOpenJobs,
+    refreshJobs
   };
 };

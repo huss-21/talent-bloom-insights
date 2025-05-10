@@ -1,3 +1,4 @@
+
 export type Role = "admin" | "applicant";
 
 export interface User {

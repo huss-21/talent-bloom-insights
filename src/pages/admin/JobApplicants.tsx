@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { useApplicants } from "@/hooks/useApplicants";
 import { format } from "date-fns";
-import { ArrowLeft, Download, FileText, User } from "lucide-react";
+import { ArrowLeft, Download, FileText, User, Loader, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -21,13 +22,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ApplicantRatingCharts } from "@/components/ApplicantRatingCharts";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const JobApplicants = () => {
   const { jobId } = useParams();
-  const { getJobById } = useJobOpenings();
-  const { applicants, ratings, getApplicantsByJobId, getRatingByApplicantId, getResumeDownloadUrl } = useApplicants();
+  const { getJobById, loading: jobLoading } = useJobOpenings();
+  const { applicants, ratings, getApplicantsByJobId, getRatingByApplicantId, getResumeDownloadUrl, loading: applicantsLoading } = useApplicants();
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
+  const isLoading = jobLoading || applicantsLoading;
   const job = jobId ? getJobById(jobId) : null;
   const jobApplicants = jobId ? getApplicantsByJobId(jobId) : [];
   
@@ -81,10 +85,37 @@ const JobApplicants = () => {
     }
   };
 
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    window.location.reload();
+  };
+
+  if (isLoading) {
+    return (
+      <MainLayout roles={["admin"]}>
+        <div className="space-y-4 p-6">
+          <div className="flex items-center space-x-2">
+            <Link to="/admin/jobs">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Jobs
+              </Button>
+            </Link>
+          </div>
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <Loader className="h-12 w-12 animate-spin mx-auto text-muted-foreground" />
+              <p className="mt-4 text-lg">Loading job applicants...</p>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   if (!job) {
     return (
       <MainLayout roles={["admin"]}>
-        <div className="space-y-4">
+        <div className="space-y-4 p-6">
           <div className="flex items-center space-x-2">
             <Link to="/admin/jobs">
               <Button variant="outline" size="sm">
@@ -93,8 +124,12 @@ const JobApplicants = () => {
             </Link>
           </div>
           <Card>
-            <CardContent className="pt-6">
-              <p>Job opening not found.</p>
+            <CardContent className="pt-6 text-center">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+              <p className="text-lg font-medium">Job opening not found.</p>
+              <Button variant="default" className="mt-4" onClick={handleRetry}>
+                Retry Loading
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -102,79 +137,9 @@ const JobApplicants = () => {
     );
   }
 
-  const renderOverviewTab = () => (
-    <TabsContent value="overview" className="space-y-6 mt-6">
-      <div className="flex items-center space-x-4">
-        <div className="h-16 w-16 rounded-full bg-corporate-blue flex items-center justify-center text-white">
-          <User className="h-8 w-8" />
-        </div>
-        <div>
-          <h3 className="text-xl font-semibold">{selectedApplicant.fullName || `Applicant #${selectedApplicant.id.slice(0, 8)}`}</h3>
-          <p className="text-sm text-muted-foreground">
-            Applied on {format(new Date(selectedApplicant.applicationDate), "MMMM d, yyyy")}
-          </p>
-        </div>
-      </div>
-      
-      <Separator />
-      
-      {/* Added job description display section */}
-      {selectedApplicant.jobDescription && (
-        <div>
-          <h4 className="font-medium mb-2">Job Description</h4>
-          <div className="p-4 bg-muted/50 rounded-md">
-            <p className="text-sm whitespace-pre-wrap">{selectedApplicant.jobDescription}</p>
-          </div>
-          <Separator className="my-4" />
-        </div>
-      )}
-      
-      {selectedRating ? (
-        <div className="space-y-6">
-          <div>
-            <h4 className="font-medium mb-4">Match Summary</h4>
-            <ApplicantRatingCharts rating={selectedRating} />
-          </div>
-          
-          <div>
-            <h4 className="font-medium mb-4">Skills Analysis</h4>
-            <div className="space-y-4">
-              {Object.entries(selectedRating.criteriaScores).map(([criterion, score]) => (
-                <div key={criterion}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span>{criterion}</span>
-                    <span className={`font-medium ${
-                      score >= 80 ? 'text-green-600' : 
-                      score >= 60 ? 'text-amber-600' : 
-                      'text-red-600'
-                    }`}>
-                      {score}%
-                    </span>
-                  </div>
-                  <Progress value={score} className="h-2" />
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <h4 className="font-medium mb-4">Key Matching Phrases</h4>
-            <ul className="list-disc pl-5 space-y-1">
-              {selectedRating.keyPhrases.map((phrase, index) => (
-                <li key={index} className="text-sm">{phrase}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : (
-        <p className="text-muted-foreground">No rating data available for this applicant.</p>
-      )}
-    </TabsContent>
-  );
-
   return (
     <MainLayout roles={["admin"]}>
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-2">
@@ -190,14 +155,15 @@ const JobApplicants = () => {
             </p>
           </div>
           <Badge variant={job.status === "open" ? "default" : "secondary"} className="text-sm">
-            {job.status.toUpperCase()}
+            {job.status ? "OPEN" : "CLOSED"}
           </Badge>
         </div>
         
         {jobApplicants.length === 0 ? (
           <Card>
-            <CardContent className="pt-6">
-              <p>No applicants have applied for this position yet.</p>
+            <CardContent className="pt-6 text-center">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg font-medium">No applicants have applied for this position yet.</p>
             </CardContent>
           </Card>
         ) : (
@@ -213,7 +179,7 @@ const JobApplicants = () => {
                 <div className="space-y-2">
                   {jobApplicants.map(applicant => {
                     const applicantRating = getRatingByApplicantId(applicant.id);
-                    const matchPercentage = applicantRating ? applicantRating.overallMatchPercentage : 0;
+                    const matchPercentage = applicant.Overall || 0;
                     
                     return (
                       <div 
@@ -293,13 +259,18 @@ const JobApplicants = () => {
                           </div>
                         )}
                         
-                        {selectedRating ? (
-                          <div className="space-y-6">
-                            <div>
-                              <h4 className="font-medium mb-4">Match Summary</h4>
-                              <ApplicantRatingCharts rating={selectedRating} />
-                            </div>
-                            
+                        <div className="space-y-6">
+                          <div>
+                            <h4 className="font-medium mb-4">Match Summary</h4>
+                            <ApplicantRatingCharts 
+                              skills={selectedApplicant.Skills}
+                              education={selectedApplicant.Education}
+                              relevance={selectedApplicant.Relevance}
+                              overall={selectedApplicant.Overall}
+                            />
+                          </div>
+                          
+                          {selectedRating ? (
                             <div>
                               <h4 className="font-medium mb-4">Skills Analysis</h4>
                               <div className="space-y-4">
@@ -320,7 +291,9 @@ const JobApplicants = () => {
                                 ))}
                               </div>
                             </div>
-                            
+                          ) : null}
+                          
+                          {selectedRating?.keyPhrases && selectedRating.keyPhrases.length > 0 ? (
                             <div>
                               <h4 className="font-medium mb-4">Key Matching Phrases</h4>
                               <ul className="list-disc pl-5 space-y-1">
@@ -329,10 +302,12 @@ const JobApplicants = () => {
                                 ))}
                               </ul>
                             </div>
-                          </div>
-                        ) : (
-                          <p className="text-muted-foreground">No rating data available for this applicant.</p>
-                        )}
+                          ) : null}
+                          
+                          {!selectedRating && (
+                            <p className="text-muted-foreground">No detailed rating data available for this applicant.</p>
+                          )}
+                        </div>
                       </TabsContent>
                       <TabsContent value="resume" className="space-y-6 mt-6">
                         <div className="flex justify-between items-center">
@@ -377,7 +352,7 @@ const JobApplicants = () => {
                             </TableHeader>
                             <TableBody>
                               {selectedRating && Object.entries(selectedRating.criteriaScores).map(([criterion, score]) => {
-                                const jobCriteriaWeight = job.criteria[criterion] || 0;
+                                const jobCriteriaWeight = job.criteria?.[criterion] || 0;
                                 
                                 return (
                                   <TableRow key={criterion}>
@@ -393,6 +368,14 @@ const JobApplicants = () => {
                                   </TableRow>
                                 );
                               })}
+                              
+                              {!selectedRating && (
+                                <TableRow>
+                                  <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                    No detailed ratings available
+                                  </TableCell>
+                                </TableRow>
+                              )}
                             </TableBody>
                           </Table>
                         </div>
@@ -404,114 +387,6 @@ const JobApplicants = () => {
             </Card>
           </div>
         )}
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>LLM Integration Guide</CardTitle>
-            <CardDescription>How to connect to an LLM API for resume analysis</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium mb-2">Step 1: Choose an LLM Provider</h3>
-              <p className="text-sm text-muted-foreground">
-                You can integrate with OpenAI's API (GPT-4/GPT-3.5) or AWS Bedrock (Claude, LLaMa, etc.)
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium mb-2">Step 2: Setup API Integration</h3>
-              <div className="bg-gray-50 p-4 rounded-md">
-                <pre className="text-xs overflow-x-auto">
-{`// Example OpenAI API integration
-async function analyzeResume(resumeText, jobCriteria) {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": \`Bearer \${process.env.OPENAI_API_KEY}\`
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a resume analyzer that evaluates candidates based on job criteria."
-        },
-        {
-          role: "user",
-          content: \`
-            Analyze this resume against the following criteria. 
-            Provide scores between 0-100 for each criterion and an overall match percentage.
-            Also include 3-5 key phrases from the resume that match the job requirements.
-            
-            Job Criteria: \${JSON.stringify(jobCriteria)}
-            
-            Resume Text:
-            \${resumeText}
-            
-            Respond with a JSON object with this structure:
-            {
-              "criteriaScores": { "criterion1": score1, "criterion2": score2... },
-              "overallMatchPercentage": number,
-              "keyPhrases": ["phrase1", "phrase2", "phrase3"]
-            }
-          \`
-        }
-      ]
-    })
-  });
-  
-  const result = await response.json();
-  return JSON.parse(result.choices[0].message.content);
-}`}
-                </pre>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium mb-2">Step 3: Implement in the Application</h3>
-              <p className="text-sm text-muted-foreground mb-2">
-                The best place to implement this functionality would be in a new file:
-              </p>
-              <code className="text-sm bg-gray-50 p-2 rounded">/src/services/resumeAnalysis.ts</code>
-              <p className="text-sm text-muted-foreground mt-2">
-                This service would handle PDF text extraction and LLM analysis, then update the applicant's rating in the database.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium mb-2">Step 4: Extract Text from PDFs</h3>
-              <div className="bg-gray-50 p-4 rounded-md">
-                <pre className="text-xs overflow-x-auto">
-{`// Example PDF text extraction
-import * as pdfjs from 'pdfjs-dist';
-
-async function extractTextFromPDF(pdfFile) {
-  // Set up PDF.js worker
-  const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-  
-  // Load the PDF
-  const arrayBuffer = await pdfFile.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-  
-  let fullText = '';
-  
-  // Extract text from each page
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items.map(item => item.str).join(' ');
-    fullText += pageText + ' ';
-  }
-  
-  return fullText;
-}`}
-                </pre>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </MainLayout>
   );

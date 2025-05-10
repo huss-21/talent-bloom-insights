@@ -2,7 +2,6 @@
 import React from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CirclePercent } from "lucide-react";
 
 interface ApplicantRatingChartsProps {
   skills: number | null;

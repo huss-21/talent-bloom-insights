@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { format } from "date-fns";
-import { User, FileText, Search, CheckCircle, Clock, XCircle, Download, RefreshCw, IdCard } from "lucide-react";
+import { User, FileText, Search, CheckCircle, Clock, XCircle, Download, RefreshCw, IdCard, Eye, AlertTriangle, Loader } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,13 +35,24 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { ApplicantRatingCharts } from "@/components/ApplicantRatingCharts";
+import { Applicant } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Applicants = () => {
   const { applicants, loading, updateApplicationStatus, getResumeDownloadUrl } = useApplicants();
-  const { jobOpenings, getJobById } = useJobOpenings();
+  const { jobOpenings, getJobById, loading: jobsLoading } = useJobOpenings();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   
   // Filter applicants based on search query
   const filteredApplicants = applicants.filter(applicant => {
@@ -66,6 +78,33 @@ const Applicants = () => {
     if (activeTab === "hired") return applicant.status === "hired";
     return true;
   });
+
+  // Sort applicants by overall rating (descending)
+  const sortedApplicants = [...displayedApplicants].sort((a, b) => {
+    const overallA = a.Overall || 0;
+    const overallB = b.Overall || 0;
+    return overallB - overallA;
+  });
+  
+  // Handle refresh attempt
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    
+    try {
+      // Simulate refreshing data by forcing re-fetches
+      window.location.reload();
+    } catch (error) {
+      console.error("Refresh error:", error);
+      toast({
+        title: "Refresh failed",
+        description: "Could not refresh data. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      // In case the page doesn't reload, still reset the refresh state
+      setTimeout(() => setIsRefreshing(false), 2000);
+    }
+  };
   
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -123,7 +162,6 @@ const Applicants = () => {
       const url = await getResumeDownloadUrl(applicant.resumeFilePath);
       
       if (url) {
-        // Open in new tab
         window.open(url, '_blank');
       } else {
         throw new Error("Could not generate download URL");
@@ -137,6 +175,30 @@ const Applicants = () => {
       });
     }
   };
+
+  const handleViewDetails = (applicant: Applicant) => {
+    setSelectedApplicant(applicant);
+    setDialogOpen(true);
+  };
+  
+  // Render loading skeleton
+  if (loading) {
+    return (
+      <MainLayout roles={["admin"]}>
+        <div className="container mx-auto py-6">
+          <h1 className="text-3xl font-bold mb-6">Applicant Management</h1>
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-full" />
+            <div className="space-y-6">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-64 w-full" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout roles={["admin"]}>
@@ -157,46 +219,66 @@ const Applicants = () => {
             </div>
           </div>
           
-          <Select
-            value={activeTab}
-            onValueChange={setActiveTab}
-          >
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Applications</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="reviewed">Reviewed</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="hired">Hired</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={activeTab}
+              onValueChange={setActiveTab}
+            >
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Applications</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="reviewed">Reviewed</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="hired">Hired</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={handleRefresh} 
+              disabled={isRefreshing}
+              title="Refresh data"
+            >
+              {isRefreshing ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Applicants ({loading ? "..." : displayedApplicants.length})</CardTitle>
+              <CardTitle>Applicants ({loading ? "..." : sortedApplicants.length})</CardTitle>
               <CardDescription>
-                Review all applicants and their match scores
+                Review all applicants and their match scores - sorted by overall rating
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-4">Loading applicants...</div>
-            ) : displayedApplicants.length === 0 ? (
-              <div className="text-center py-4">No applicants found</div>
+            ) : sortedApplicants.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+                <h3 className="text-lg font-medium">No applicants found</h3>
+                <p className="text-muted-foreground">No applicants matching your search criteria.</p>
+              </div>
             ) : (
               <div className="space-y-8">
-                {displayedApplicants.map((applicant) => {
+                {sortedApplicants.map((applicant) => {
                   const job = getJobById(applicant.jobId);
                   return (
-                    <div key={applicant.id} className="border rounded-lg p-4 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Applicant Info */}
-                        <div>
+                    <div key={applicant.id} className="border rounded-lg p-4 space-y-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+                        {/* Applicant Info (takes 2 columns) */}
+                        <div className="lg:col-span-2">
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center">
                               <User className="h-5 w-5 mr-2 text-muted-foreground" />
@@ -224,15 +306,34 @@ const Applicants = () => {
                             </div>
                           </div>
                           
-                          <div>
+                          <div className="mb-4">
                             <p className="text-sm text-muted-foreground">Job Position</p>
                             <p className="font-medium">{job ? job.title : "Unknown job"}</p>
                             <p className="text-sm text-muted-foreground">{job ? job.department : ""}</p>
                           </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadResume(applicant)}
+                              title="Download Resume"
+                            >
+                              <Download className="h-4 w-4 mr-1" /> Resume
+                            </Button>
+                            
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleViewDetails(applicant)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" /> View Details
+                            </Button>
+                          </div>
                         </div>
                         
-                        {/* Rating Charts */}
-                        <div>
+                        {/* Rating Charts (takes 4 columns) */}
+                        <div className="lg:col-span-4">
                           <ApplicantRatingCharts 
                             skills={applicant.Skills} 
                             education={applicant.Education}
@@ -242,16 +343,8 @@ const Applicants = () => {
                         </div>
                       </div>
                       
+                      {/* Status Update */}
                       <div className="flex items-center justify-end gap-2 pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadResume(applicant)}
-                          title="Download Resume"
-                        >
-                          <Download className="h-4 w-4 mr-1" /> Resume
-                        </Button>
-                        
                         <Select
                           value={applicant.status}
                           onValueChange={(value) => handleStatusChange(applicant.id, value)}
@@ -275,10 +368,126 @@ const Applicants = () => {
           </CardContent>
           <CardFooter>
             <p className="text-sm text-muted-foreground">
-              Showing {displayedApplicants.length} of {filteredApplicants.length} applicants
+              Showing {sortedApplicants.length} of {filteredApplicants.length} applicants
             </p>
           </CardFooter>
         </Card>
+
+        {/* Applicant Details Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Applicant Details</DialogTitle>
+              <DialogDescription>
+                Detailed information about {selectedApplicant?.fullName}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedApplicant && (
+              <div className="space-y-6 py-4">
+                {/* Personal Information */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Personal Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Full Name</p>
+                      <p className="font-medium">{selectedApplicant.fullName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="font-medium">{selectedApplicant.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">National ID</p>
+                      <p className="font-medium">{selectedApplicant.nationalId || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Applied Date</p>
+                      <p className="font-medium">
+                        {selectedApplicant.applicationDate 
+                          ? format(new Date(selectedApplicant.applicationDate), "MMMM d, yyyy") 
+                          : "Unknown"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Job Information */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Job Information</h3>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Position</p>
+                    <p className="font-medium">{getJobById(selectedApplicant.jobId)?.title || "Unknown job"}</p>
+                  </div>
+                  
+                  {selectedApplicant.jobDescription && (
+                    <div className="mt-2">
+                      <p className="text-sm text-muted-foreground">Job Description</p>
+                      <div className="p-3 bg-muted rounded-md mt-1">
+                        <p className="text-sm whitespace-pre-wrap">{selectedApplicant.jobDescription}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Match Scores */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Match Scores</h3>
+                  <ApplicantRatingCharts 
+                    skills={selectedApplicant.Skills} 
+                    education={selectedApplicant.Education}
+                    relevance={selectedApplicant.Relevance}
+                    overall={selectedApplicant.Overall}
+                  />
+                </div>
+                
+                {/* Resume */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Resume</h3>
+                  {selectedApplicant.resumeFilePath ? (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleDownloadResume(selectedApplicant)}
+                    >
+                      <Download className="h-4 w-4 mr-2" /> Download {selectedApplicant.resumeFileName || "Resume"}
+                    </Button>
+                  ) : (
+                    <p className="text-muted-foreground">No resume available</p>
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setDialogOpen(false)}
+                  >
+                    Close
+                  </Button>
+                  <Select
+                    value={selectedApplicant.status}
+                    onValueChange={(value) => {
+                      handleStatusChange(selectedApplicant.id, value);
+                      // Update the selected applicant's status in the local state
+                      setSelectedApplicant({...selectedApplicant, status: value});
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Update Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="reviewed">Reviewed</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="hired">Hired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

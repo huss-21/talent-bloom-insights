@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -10,21 +11,33 @@ const MOCK_APPLICANTS: Applicant[] = [
     userId: "2", // John Applicant
     jobId: "1", // Frontend Developer
     resumeUrl: "/mock-resume.pdf",
-    applicationDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() // 5 days ago
+    applicationDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+    Skills: 85,
+    Education: 75,
+    Relevance: 80,
+    Overall: 82
   },
   {
     id: "2",
     userId: "3", // Mock user
     jobId: "1", // Frontend Developer
     resumeUrl: "/mock-resume-2.pdf",
-    applicationDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() // 3 days ago
+    applicationDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
+    Skills: 70,
+    Education: 85,
+    Relevance: 65,
+    Overall: 75
   },
   {
     id: "3",
     userId: "4", // Mock user
     jobId: "2", // Backend Engineer
     resumeUrl: "/mock-resume-3.pdf",
-    applicationDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days ago
+    applicationDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+    Skills: 90,
+    Education: 70,
+    Relevance: 85,
+    Overall: 83
   }
 ];
 
@@ -102,120 +115,170 @@ export const useApplicants = () => {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [fetchRetries, setFetchRetries] = useState(0);
 
   // Fetch applicants and ratings from Supabase
-  useEffect(() => {
-    const fetchApplicantsAndRatings = async () => {
-      try {
-        setLoading(true);
+  const fetchApplicantsAndRatings = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Fetching job applications, attempt:", fetchRetries + 1);
+      
+      // 1. Fetch job applications from the new table
+      const { data: applicationsData, error: applicationsError } = await supabase
+        .from('job_applications')
+        .select('*')
+        .order('applied_at', { ascending: false });
+
+      if (applicationsError) {
+        throw applicationsError;
+      }
+
+      console.log("Raw applications data from DB:", applicationsData);
+
+      // 2. Transform data to match our Applicant type
+      let transformedApplicants: Applicant[] = [];
+      
+      if (!applicationsData || applicationsData.length === 0) {
+        console.log("No applications found in database, using mock data");
+        setApplicants(MOCK_APPLICANTS);
+      } else {
+        transformedApplicants = applicationsData.map((app) => ({
+          id: app.id,
+          userId: app.user_id,
+          jobId: app.job_id,
+          fullName: app.full_name,
+          email: app.email,
+          nationalId: app.national_id || '',
+          resumeUrl: app.resume_url || '',
+          resumeFileName: app.resume_file_name || '',
+          resumeFilePath: app.resume_file_path || '',
+          applicationDate: app.applied_at,
+          status: app.status,
+          matchScore: app.match_score,
+          jobDescription: app.job_description || '',
+          Skills: app.Skills,
+          Education: app.Education,
+          Relevance: app.Relevance,
+          Overall: app.Overall
+        }));
         
-        // 1. Fetch job applications from the new table
-        const { data: applicationsData, error: applicationsError } = await supabase
-          .from('job_applications')
-          .select('*')
-          .order('applied_at', { ascending: false });
+        setApplicants(transformedApplicants);
+        console.log("Transformed applications:", transformedApplicants);
+      }
 
-        if (applicationsError) {
-          throw applicationsError;
-        }
+      // 3. Fetch ratings from the database
+      console.log("Fetching ratings data");
+      const { data: ratingsData, error: ratingsError } = await supabase
+        .from('ratings')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        console.log("Raw applications data from DB:", applicationsData);
+      if (ratingsError) {
+        throw ratingsError;
+      }
 
-        // 2. Transform data to match our Applicant type
-        let transformedApplicants: Applicant[] = [];
-        
-        if (!applicationsData || applicationsData.length === 0) {
-          console.log("No applications found in database, using mock data");
-          setApplicants(MOCK_APPLICANTS);
-        } else {
-          transformedApplicants = applicationsData.map((app) => ({
-            id: app.id,
-            userId: app.user_id,
-            jobId: app.job_id,
-            fullName: app.full_name,
-            email: app.email,
-            nationalId: app.national_id || '',
-            resumeUrl: app.resume_url || '',
-            resumeFileName: app.resume_file_name || '',
-            resumeFilePath: app.resume_file_path || '',
-            applicationDate: app.applied_at,
-            status: app.status,
-            matchScore: app.match_score,
-            jobDescription: app.job_description || '',
-            Skills: app.Skills,
-            Education: app.Education,
-            Relevance: app.Relevance,
-            Overall: app.Overall
-          }));
+      if (!ratingsData || ratingsData.length === 0) {
+        console.log("No ratings found in database, using mock data");
+        setRatings(MOCK_RATINGS);
+      } else {
+        // Transform data to match our Rating type
+        const transformedRatings: Rating[] = ratingsData.map((rating) => {
+          // Parse criteria_scores from JSON if needed
+          let criteriaScores: Record<string, number> = {};
           
-          setApplicants(transformedApplicants);
-          console.log("Transformed applications:", transformedApplicants);
-        }
-
-        // 3. Fetch ratings from the database
-        const { data: ratingsData, error: ratingsError } = await supabase
-          .from('ratings')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (ratingsError) {
-          throw ratingsError;
-        }
-
-        if (!ratingsData || ratingsData.length === 0) {
-          console.log("No ratings found in database, using mock data");
-          setRatings(MOCK_RATINGS);
-        } else {
-          // Transform data to match our Rating type
-          const transformedRatings: Rating[] = ratingsData.map((rating) => {
-            // Parse criteria_scores from JSON if needed
-            let criteriaScores: Record<string, number> = {};
-            
-            try {
-              if (typeof rating.criteria_scores === 'string') {
-                criteriaScores = JSON.parse(rating.criteria_scores);
-              } else if (rating.criteria_scores && typeof rating.criteria_scores === 'object') {
-                criteriaScores = rating.criteria_scores as Record<string, number>;
-              }
-            } catch (error) {
-              console.error("Error parsing criteria scores:", error);
-              criteriaScores = {};
+          try {
+            if (typeof rating.criteria_scores === 'string') {
+              criteriaScores = JSON.parse(rating.criteria_scores);
+            } else if (rating.criteria_scores && typeof rating.criteria_scores === 'object') {
+              criteriaScores = rating.criteria_scores as Record<string, number>;
             }
-            
-            return {
-              id: rating.id,
-              applicantId: rating.applicant_id,
-              criteriaScores: criteriaScores,
-              overallMatchPercentage: rating.overall_match_percentage,
-              skillsMatchPercentage: rating.skills_match_percentage,
-              educationMatchPercentage: rating.education_match_percentage,
-              experienceMatchPercentage: rating.experience_match_percentage,
-              keyPhrases: Array.isArray(rating.key_phrases) ? rating.key_phrases : [],
-              createdAt: rating.created_at
-            };
-          });
+          } catch (error) {
+            console.error("Error parsing criteria scores:", error);
+            criteriaScores = {};
+          }
           
-          setRatings(transformedRatings);
-          console.log("Fetched ratings:", transformedRatings);
+          return {
+            id: rating.id,
+            applicantId: rating.applicant_id,
+            criteriaScores: criteriaScores,
+            overallMatchPercentage: rating.overall_match_percentage,
+            skillsMatchPercentage: rating.skills_match_percentage,
+            educationMatchPercentage: rating.education_match_percentage,
+            experienceMatchPercentage: rating.experience_match_percentage,
+            keyPhrases: Array.isArray(rating.key_phrases) ? rating.key_phrases : [],
+            createdAt: rating.created_at
+          };
+        });
+        
+        setRatings(transformedRatings);
+        console.log("Fetched ratings:", transformedRatings);
+      }
+
+      // Reset retry counter on successful fetch
+      setFetchRetries(0);
+      
+    } catch (error) {
+      console.error("Error fetching applicants data:", error);
+      setError(error as Error);
+      
+      // Increment retry counter
+      setFetchRetries(prev => prev + 1);
+      
+      if (fetchRetries < 3) {
+        // Only show toast for the first retry
+        if (fetchRetries === 0) {
+          toast({
+            title: "Loading error",
+            description: "Having trouble loading data. Retrying in the background...",
+            variant: "destructive",
+          });
         }
-      } catch (error) {
-        console.error("Error fetching applicants data:", error);
+        
+        // Fall back to mock data if there's an error
+        if (!applicants.length) {
+          setApplicants(MOCK_APPLICANTS);
+        }
+        if (!ratings.length) {
+          setRatings(MOCK_RATINGS);
+        }
+        
+        // Schedule a retry
+        setTimeout(() => {
+          console.log("Retrying fetch due to error, attempt:", fetchRetries + 1);
+          fetchApplicantsAndRatings();
+        }, 3000);
+      } else {
         toast({
           title: "Error",
-          description: "Failed to load applicants data. Using mock data instead.",
+          description: "Failed to load applicants data after multiple attempts. Using mock data instead.",
           variant: "destructive",
         });
         
         // Fall back to mock data if there's an error
         setApplicants(MOCK_APPLICANTS);
         setRatings(MOCK_RATINGS);
-      } finally {
-        setLoading(false);
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchRetries, applicants.length, ratings.length]);
 
+  useEffect(() => {
     fetchApplicantsAndRatings();
-  }, []);
+    
+    // Setup auto-refresh of data
+    const refreshInterval = setInterval(() => {
+      if (error) {
+        console.log("Attempting to refresh data due to previous error");
+        fetchApplicantsAndRatings();
+      }
+    }, 60000); // Every minute if there was an error
+    
+    return () => clearInterval(refreshInterval);
+  }, [fetchApplicantsAndRatings, error]);
 
   // Add a new application to the database
   const addApplication = async (application: {
@@ -290,7 +353,11 @@ export const useApplicants = () => {
         applicationDate: data.applied_at,
         status: data.status,
         matchScore: data.match_score,
-        jobDescription: data.job_description || ''
+        jobDescription: data.job_description || '',
+        Skills: data.Skills || null,
+        Education: data.Education || null,
+        Relevance: data.Relevance || null,
+        Overall: data.Overall || null
       };
 
       // Update local state
@@ -375,14 +442,27 @@ export const useApplicants = () => {
       // Also update the match score in the job_applications table
       await supabase
         .from('job_applications')
-        .update({ match_score: newRating.overallMatchPercentage })
+        .update({ 
+          match_score: newRating.overallMatchPercentage,
+          Skills: newRating.skillsMatchPercentage,
+          Education: newRating.educationMatchPercentage,
+          Relevance: newRating.experienceMatchPercentage,
+          Overall: newRating.overallMatchPercentage
+        })
         .eq('id', rating.applicantId);
       
-      // Update the applicant's matchScore in the local state
+      // Update the applicant's scores in local state
       setApplicants(prevApplicants => 
         prevApplicants.map(app => 
           app.id === rating.applicantId 
-            ? { ...app, matchScore: newRating.overallMatchPercentage }
+            ? { 
+                ...app, 
+                matchScore: newRating.overallMatchPercentage,
+                Skills: newRating.skillsMatchPercentage,
+                Education: newRating.educationMatchPercentage,
+                Relevance: newRating.experienceMatchPercentage,
+                Overall: newRating.overallMatchPercentage
+              }
             : app
         )
       );
@@ -424,19 +504,42 @@ export const useApplicants = () => {
   // Function to get the resume download URL
   const getResumeDownloadUrl = async (filePath: string) => {
     try {
-      const { data, error } = await supabase
-        .storage
-        .from('resumes')
-        .createSignedUrl(filePath, 60); // URL valid for 60 seconds
+      const maxRetries = 3;
+      let currentRetry = 0;
+      let downloadUrl = null;
       
-      if (error) {
-        console.error("Error creating signed URL:", error);
-        throw error;
+      while (currentRetry < maxRetries && !downloadUrl) {
+        try {
+          const { data, error } = await supabase
+            .storage
+            .from('resumes')
+            .createSignedUrl(filePath, 60); // URL valid for 60 seconds
+          
+          if (error) {
+            throw error;
+          }
+          
+          downloadUrl = data.signedUrl;
+        } catch (err) {
+          currentRetry++;
+          
+          if (currentRetry >= maxRetries) {
+            throw err;
+          }
+          
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
       
-      return data.signedUrl;
+      return downloadUrl;
     } catch (error) {
       console.error("Error getting download URL:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not generate download URL for the resume",
+        variant: "destructive",
+      });
       return null;
     }
   };
@@ -445,12 +548,14 @@ export const useApplicants = () => {
     applicants,
     ratings,
     loading,
+    error,
     addApplication,
     updateApplicationStatus,
     addRating,
     getApplicantsByJobId,
     getRatingByApplicantId,
     getApplicantsByUserId,
-    getResumeDownloadUrl
+    getResumeDownloadUrl,
+    refreshData: fetchApplicantsAndRatings
   };
 };
