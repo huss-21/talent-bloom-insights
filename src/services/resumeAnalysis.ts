@@ -1,11 +1,10 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import axios from 'axios';
-import pdfParse from 'pdf-parse';
-import { Request, Response } from 'express';
 
 const STORAGE_BUCKET_NAME: string = "resumes";
 
+// LLM Configuration class - exported for use in LLMConfig.tsx
 export class LLMConfig {
     static Prompts = class {
         static system: string = `You are an expert talent acquisition leader that evaluates candidates by comparing their resumes to the job description 
@@ -63,20 +62,31 @@ Resume Text:
     };
 }
 
-async function extract_text_from_pdf(pdf_bytes: ArrayBuffer): Promise<string> {
-    const pdf = await pdfParse(Buffer.from(pdf_bytes));
-    return pdf.text || "";
-}
+// Export the LLMConfig for use in the admin UI
+export const LLMSettings = LLMConfig;
+
+// Simplified type definitions for browser compatibility
+type Request = {
+    headers: Record<string, string | undefined>;
+    body: any;
+};
+
+type Response = {
+    status: (code: number) => {
+        send: (message: string) => void;
+        json: (data: any) => void;
+    };
+};
 
 async function analyze_resume_with_openai(resume_text: string, job_description: string, api_key: string): Promise<{ Skills: number; Education: number; Relevance: number; Overall: number }> {
-    const user_prompt: string = LLMConfig.Prompts.user.replace("{{jobDescription}}", job_description).replace("{{resumeText}}", resume_text);
+    const user_prompt: string = LLMConfig.prompts.user.replace("{{jobDescription}}", job_description).replace("{{resumeText}}", resume_text);
     try {
         const response = await axios.post(
             "https://api.openai.com/v1/chat/completions",
             {
                 model: "gpt-4o",
                 messages: [
-                    { role: "system", content: LLMConfig.Prompts.system },
+                    { role: "system", content: LLMConfig.prompts.system },
                     { role: "user", content: user_prompt }
                 ]
             },
@@ -106,73 +116,9 @@ async function analyze_resume_with_openai(resume_text: string, job_description: 
     }
 }
 
+// Note: This function will only be used server-side in a Supabase Edge Function
 export async function process_job_application(request: Request, response: Response): Promise<void> {
-    // Verify webhook secret (optional security)
-    const expected_secret: string | undefined = process.env['WEBHOOK_SECRET'];
-    const auth_header: string | undefined = request.headers['authorization'];
-    if (expected_secret && (!auth_header || auth_header !== `Bearer ${expected_secret}`)) {
-        response.status(401).send("Unauthorized");
-        return;
-    }
-
-    try {
-        // Parse webhook payload
-        const data = request.body;
-        const record = data.record;
-        const application_id: string = record.id;
-        const resume_path: string = record.resume_file_path;
-        const job_description: string = record.job_description;
-
-        console.log(`Processing application ID: ${application_id}, Resume path: ${resume_path}`);
-        
-        if (!resume_path || !job_description) {
-            throw new Error("Missing required fields: resume_path or job_description");
-        }
-
-        // Get environment variables
-        const supabase_url: string = process.env['SUPABASE_URL'] || "https://zpfssnryuokejdiykwqe.supabase.co";
-        const supabase_key: string = process.env['SUPABASE_SERVICE_ROLE_KEY'] || "";
-        const openai_api_key: string = process.env['OPENAI_API_KEY'] || "";
-        
-        if (!supabase_key || !openai_api_key) {
-            throw new Error("Missing required environment variables: SUPABASE_SERVICE_ROLE_KEY or OPENAI_API_KEY");
-        }
-
-        // Initialize Supabase client
-        const supabase: SupabaseClient = createClient(supabase_url, supabase_key);
-
-        // Download resume from Supabase Storage
-        console.log(`Downloading resume from ${STORAGE_BUCKET_NAME}/${resume_path}`);
-        const { data: fileData, error: downloadError } = await supabase.storage
-            .from(STORAGE_BUCKET_NAME)
-            .download(resume_path);
-
-        if (downloadError || !fileData) {
-            throw new Error(`Error downloading resume: ${downloadError?.message || "No data returned"}`);
-        }
-        
-        // Convert Blob to ArrayBuffer
-        const arrayBuffer = await fileData.arrayBuffer();
-        
-        // Extract text from the resume PDF
-        const resume_text: string = await extract_text_from_pdf(arrayBuffer);
-        console.log(`Extracted text from resume (length: ${resume_text.length})`);
-
-        // Analyze resume using OpenAI
-        const analysis_result = await analyze_resume_with_openai(resume_text, job_description, openai_api_key);
-        console.log("Analysis result:", analysis_result);
-
-        // Return the result back to the webhook
-        response.status(200).json({
-            success: true,
-            message: "Resume analyzed successfully",
-            analysis_result: analysis_result
-        });
-    } catch (e: any) {
-        console.error(`Error: ${e.message}`);
-        response.status(500).json({
-            success: false,
-            error: e.message
-        });
-    }
+    // Implementation will be moved to Supabase Edge Function
+    console.log("This function is intended for server-side use in Supabase Edge Functions");
+    response.status(501).json({ error: "Not implemented in browser" });
 }
