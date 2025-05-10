@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
 import { useJobOpenings } from "@/hooks/useJobOpenings";
 import { format } from "date-fns";
-import { User, FileText, Search, CheckCircle, Clock, XCircle, Download, RefreshCw, IdCard, Eye, AlertTriangle, Loader } from "lucide-react";
+import { User, FileText, Search, CheckCircle, Clock, XCircle, Download, RefreshCw, IdCard, Eye, AlertTriangle, Loader, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,15 +43,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
 
 const Applicants = () => {
-  const { applicants, loading, updateApplicationStatus, getResumeDownloadUrl } = useApplicants();
+  const { applicants, loading, updateApplicationStatus, getResumeDownloadUrl, refreshData } = useApplicants();
   const { jobOpenings, getJobById, loading: jobsLoading } = useJobOpenings();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [analyzingApplicants, setAnalyzingApplicants] = useState<Record<string, boolean>>({});
   
   // Filter applicants based on search query
   const filteredApplicants = applicants.filter(applicant => {
@@ -91,8 +92,11 @@ const Applicants = () => {
     setIsRefreshing(true);
     
     try {
-      // Simulate refreshing data by forcing re-fetches
-      window.location.reload();
+      await refreshData();
+      toast({
+        title: "Data refreshed",
+        description: "Applicant data has been refreshed successfully.",
+      });
     } catch (error) {
       console.error("Refresh error:", error);
       toast({
@@ -101,8 +105,7 @@ const Applicants = () => {
         variant: "destructive",
       });
     } finally {
-      // In case the page doesn't reload, still reset the refresh state
-      setTimeout(() => setIsRefreshing(false), 2000);
+      setIsRefreshing(false);
     }
   };
   
@@ -173,6 +176,53 @@ const Applicants = () => {
         description: "Failed to download resume",
         variant: "destructive",
       });
+    }
+  };
+
+  // New function to handle the resume analysis
+  const handleAnalyzeResume = async (applicant: Applicant) => {
+    if (!applicant.resumeFilePath) {
+      toast({
+        title: "Error",
+        description: "No resume file found for analysis",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // Set the analyzing state for this applicant
+      setAnalyzingApplicants(prev => ({...prev, [applicant.id]: true}));
+      
+      // Call the analyze-resume edge function
+      const { data, error } = await supabase.functions.invoke('analyze-resume', {
+        body: { applicationId: applicant.id }
+      });
+      
+      if (error) {
+        throw new Error(`Analysis failed: ${error.message}`);
+      }
+      
+      console.log("Analysis result:", data);
+      
+      // Refresh data to show the updated ratings
+      await refreshData();
+      
+      toast({
+        title: "Resume Analyzed",
+        description: `Analysis complete for ${applicant.fullName}`,
+      });
+      
+    } catch (error) {
+      console.error("Error analyzing resume:", error);
+      toast({
+        title: "Analysis Failed",
+        description: "Could not analyze resume. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      // Clear the analyzing state for this applicant
+      setAnalyzingApplicants(prev => ({...prev, [applicant.id]: false}));
     }
   };
 
@@ -274,6 +324,12 @@ const Applicants = () => {
               <div className="space-y-8">
                 {sortedApplicants.map((applicant) => {
                   const job = getJobById(applicant.jobId);
+                  const isAnalyzing = analyzingApplicants[applicant.id] || false;
+                  const hasAnalysis = applicant.Skills !== null || 
+                                     applicant.Education !== null || 
+                                     applicant.Relevance !== null || 
+                                     applicant.Overall !== null;
+                  
                   return (
                     <div key={applicant.id} className="border rounded-lg p-4 space-y-6">
                       <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
@@ -329,17 +385,43 @@ const Applicants = () => {
                             >
                               <Eye className="h-4 w-4 mr-1" /> View Details
                             </Button>
+                            
+                            {/* New analyze resume button */}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleAnalyzeResume(applicant)}
+                              disabled={isAnalyzing}
+                              title={hasAnalysis ? "Re-analyze Resume" : "Analyze Resume"}
+                            >
+                              {isAnalyzing ? (
+                                <>
+                                  <Loader className="h-4 w-4 mr-1 animate-spin" /> Analyzing...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="h-4 w-4 mr-1" /> {hasAnalysis ? "Re-analyze" : "Analyze"}
+                                </>
+                              )}
+                            </Button>
                           </div>
                         </div>
                         
                         {/* Rating Charts (takes 4 columns) */}
                         <div className="lg:col-span-4">
-                          <ApplicantRatingCharts 
-                            skills={applicant.Skills} 
-                            education={applicant.Education}
-                            relevance={applicant.Relevance}
-                            overall={applicant.Overall}
-                          />
+                          {hasAnalysis ? (
+                            <ApplicantRatingCharts 
+                              skills={applicant.Skills} 
+                              education={applicant.Education}
+                              relevance={applicant.Relevance}
+                              overall={applicant.Overall}
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full py-8 bg-muted/30 rounded-lg">
+                              <p className="text-lg font-medium text-muted-foreground mb-2">No analysis data available</p>
+                              <p className="text-sm text-muted-foreground mb-4">Click the 'Analyze' button to evaluate this resume.</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -434,12 +516,38 @@ const Applicants = () => {
                 {/* Match Scores */}
                 <div>
                   <h3 className="text-lg font-medium mb-3">Match Scores</h3>
-                  <ApplicantRatingCharts 
-                    skills={selectedApplicant.Skills} 
-                    education={selectedApplicant.Education}
-                    relevance={selectedApplicant.Relevance}
-                    overall={selectedApplicant.Overall}
-                  />
+                  {selectedApplicant.Skills !== null || 
+                   selectedApplicant.Education !== null || 
+                   selectedApplicant.Relevance !== null || 
+                   selectedApplicant.Overall !== null ? (
+                    <ApplicantRatingCharts 
+                      skills={selectedApplicant.Skills} 
+                      education={selectedApplicant.Education}
+                      relevance={selectedApplicant.Relevance}
+                      overall={selectedApplicant.Overall}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center p-6 bg-muted/30 rounded-lg">
+                      <p className="text-lg font-medium text-muted-foreground mb-2">No analysis data available</p>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          handleAnalyzeResume(selectedApplicant);
+                        }}
+                        disabled={analyzingApplicants[selectedApplicant.id] || false}
+                      >
+                        {analyzingApplicants[selectedApplicant.id] ? (
+                          <>
+                            <Loader className="h-4 w-4 mr-2 animate-spin" /> Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" /> Analyze Resume
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Resume */}

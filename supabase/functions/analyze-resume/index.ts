@@ -175,25 +175,61 @@ async function analyzeResumeWithOpenAI(resumeText: string, jobDescription: strin
   }
 }
 
-// Process a new job application
-async function processJobApplication(record: any, supabase: any): Promise<any> {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
-    const applicationId = record.id;
-    const resumePath = record.resume_file_path;
-    const jobDescription = record.job_description || "No job description provided";
+    // Get the request body
+    const body = await req.json();
+    
+    console.log("Received manual analysis request:", JSON.stringify(body).substring(0, 200) + "...");
+    
+    // Extract the application ID
+    const applicationId = body.applicationId;
+    if (!applicationId) {
+      throw new Error("Missing applicationId in request body");
+    }
+    
+    // Initialize Supabase client
+    const supabaseUrl = "https://zpfssnryuokejdiykwqe.supabase.co";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    
+    if (!supabaseKey) {
+      throw new Error("Supabase service role key not configured");
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Fetch the application data
+    const { data: application, error: applicationError } = await supabase
+      .from('job_applications')
+      .select('*')
+      .eq('id', applicationId)
+      .single();
+    
+    if (applicationError) {
+      throw new Error(`Error fetching application: ${applicationError.message}`);
+    }
+    
+    if (!application) {
+      throw new Error(`Application with ID ${applicationId} not found`);
+    }
     
     console.log(`Processing application ID: ${applicationId}`);
-    console.log(`Resume path: ${resumePath}`);
+    console.log(`Resume path: ${application.resume_file_path}`);
     
-    if (!resumePath) {
-      throw new Error("Resume path not found in record");
+    if (!application.resume_file_path) {
+      throw new Error("Resume path not found in application record");
     }
     
     // Download resume from Supabase Storage
     const { data: pdfData, error: pdfError } = await supabase
       .storage
       .from(STORAGE_BUCKET_NAME)
-      .download(resumePath);
+      .download(application.resume_file_path);
     
     if (pdfError || !pdfData) {
       throw new Error(`Error downloading resume: ${pdfError?.message || "No data returned"}`);
@@ -204,7 +240,7 @@ async function processJobApplication(record: any, supabase: any): Promise<any> {
     const resumeText = await extractTextFromPDF(new Uint8Array(arrayBuffer));
     
     // Analyze resume using OpenAI
-    const analysisResult = await analyzeResumeWithOpenAI(resumeText, jobDescription);
+    const analysisResult = await analyzeResumeWithOpenAI(resumeText, application.job_description || "");
     
     console.log("Analysis result:", analysisResult);
     
@@ -226,56 +262,10 @@ async function processJobApplication(record: any, supabase: any): Promise<any> {
     
     console.log(`Successfully updated application ID: ${applicationId} with analysis results`);
     
-    return {
-      message: "Resume analyzed successfully",
-      analysis_result: analysisResult
-    };
-    
-  } catch (error) {
-    console.error("Error processing job application:", error);
-    throw error;
-  }
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    // Get the request body
-    const body = await req.json();
-    
-    console.log("Received payload:", JSON.stringify(body).substring(0, 200) + "...");
-    
-    // Extract the record from the webhook payload or direct function call
-    let record;
-    if (body.record) {
-      record = body.record;
-    } else if (body.type === "INSERT" && body.table === "job_applications") {
-      record = body.record;
-    } else {
-      record = body;
-    }
-    
-    // Initialize Supabase client
-    const supabaseUrl = "https://zpfssnryuokejdiykwqe.supabase.co";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    
-    if (!supabaseKey) {
-      throw new Error("Supabase service role key not configured");
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Process the job application
-    const result = await processJobApplication(record, supabase);
-    
     return new Response(
       JSON.stringify({ 
-        message: "Job application processed successfully",
-        result: result
+        message: "Resume analyzed successfully",
+        analysis_result: analysisResult
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

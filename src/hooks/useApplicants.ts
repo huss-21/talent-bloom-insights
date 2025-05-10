@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -556,6 +555,6 @@ export const useApplicants = () => {
     getRatingByApplicantId,
     getApplicantsByUserId,
     getResumeDownloadUrl,
-    refreshData: fetchApplicantsAndRatings
+    refreshData: fetchApplicantsAndRatings  // Export the refresh function
   };
 };
