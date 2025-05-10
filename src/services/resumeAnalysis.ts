@@ -1,3 +1,4 @@
+
 /**
  * Service for analyzing resumes against job criteria using LLM APIs
  */
@@ -24,30 +25,36 @@ export const LLMConfig = {
   },
   // Customizable system and user prompt templates for resume analysis
   prompts: {
-    system: "You are a resume analyzer that evaluates candidates based on job criteria.",
+    system: `You are an expert talent acquisition leader that evaluates candidates by comparing their resumes to the job description 
+Based on the following criteria:
+
+Education: Assess the relevance and level of academic qualifications (e.g., diploma, bachelor's, master's, PhD) to the job. Also consider the reputation of the institution and the field of study. For general roles, fields like Business, Communication, Finance, or relevant disciplines are considered.
+Work Experience: Evaluate the number of years of professional experience, relevance to the position, diversity of roles held, and career progression. Look for consistency, growth in responsibilities, and relevance to the open position.
+Technical Skills: Review the tools, platforms, or software the candidate is proficient in (e.g., Excel, ERP systems, CRM platforms, project management tools). Skills should align with job expectations and demonstrate practical proficiency.
+Soft Skills: Identify qualities such as communication, teamwork, leadership, adaptability, conflict resolution, and time management. These can often be inferred from job roles, references, or achievements.
+Certifications: Check for any professional certifications that support the job function (e.g., PMP for project managers, CPA for accountants, HR certificates for HR roles). Certifications reflect a commitment to development and industry standards.
+Language Proficiency: Consider both written and spoken proficiency in relevant languages. This is particularly important for client-facing, administrative, or regional roles.
+Achievements & Awards: Look for quantifiable achievements (e.g., sales targets exceeded, process improvements implemented, employee of the month awards) and recognitions that indicate exceptional performance.
+Relevance to Role: Determine how well the candidate's profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
+Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here.`,
     user: `
-      Analyze this resume against the following criteria. 
-      Provide scores between 0-100 for each criterion and separately calculate:
-      - Overall match percentage
-      - Skills match percentage (based on technical and soft skills)
-      - Education match percentage (based on academic qualifications)
-      - Experience match percentage (based on relevant work experience)
-      
-      Also include 3-5 key phrases from the resume that match the job requirements.
-      
-      Job Criteria: {jobCriteria}
-      
-      Resume Text:
-      {resumeText}
-      
-      Respond with a JSON object with this structure:
-      {
-        "criteriaScores": { "criterion1": score1, "criterion2": score2... },
-        "overallMatchPercentage": number,
-        "skillsMatchPercentage": number,
-        "educationMatchPercentage": number,
-        "keyPhrases": ["phrase1", "phrase2", "phrase3"]
-      }
+Analyze this resume against the provided job description based on the criteria specified in the system prompt.
+
+After analyzing, provide a JSON object with the following structure:
+{
+    "criteriaScores": { "criterion1": score1, "criterion2": score2... },
+    "overallMatchPercentage": number,
+    "skillsMatchPercentage": number,
+    "educationMatchPercentage": number,
+    "experienceMatchPercentage": number,
+    "keyPhrases": ["phrase1", "phrase2", "phrase3"]
+}
+
+Job Description:
+{jobDescription}
+
+Resume Text:
+{resumeText}
     `,
     // Method to update prompts if needed
     updatePrompts: (system?: string, user?: string) => {
