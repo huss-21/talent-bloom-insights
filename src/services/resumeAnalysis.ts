@@ -42,13 +42,12 @@ Analyze this resume against the provided job description based on the criteria s
 
 After analyzing, provide a JSON object with the following structure:
 {
-    "criteriaScores": { "criterion1": score1, "criterion2": score2... },
-    "overallMatchPercentage": number,
-    "skillsMatchPercentage": number,
-    "educationMatchPercentage": number,
-    "experienceMatchPercentage": number,
-    "keyPhrases": ["phrase1", "phrase2", "phrase3"]
+    "Skills": XX,
+    "Education": XX,
+    "Relevance": XX,
+    "Overall": XX
 }
+where XX is the percentage match for each category (an integer between 0 and 100).
 
 Job Description:
 {jobDescription}
@@ -144,7 +143,33 @@ export async function analyzeResumeWithOpenAI(
     }
 
     const result = await response.json();
-    return JSON.parse(result.choices[0].message.content);
+    
+    // The Python service returns a different format, so we need to adapt
+    const resultContent = JSON.parse(result.choices[0].message.content);
+    
+    // In case the Python service returns percentage strings with % sign
+    const parsePercentage = (value: string | number): number => {
+      if (typeof value === 'string') {
+        return parseInt(value.replace('%', ''), 10);
+      }
+      return value as number;
+    };
+    
+    // Convert to our frontend expected format
+    return {
+      criteriaScores: {
+        "Skills": parsePercentage(resultContent.Skills),
+        "Education": parsePercentage(resultContent.Education),
+        "Relevance": parsePercentage(resultContent.Relevance),
+      },
+      overallMatchPercentage: parsePercentage(resultContent.Overall),
+      skillsMatchPercentage: parsePercentage(resultContent.Skills),
+      educationMatchPercentage: parsePercentage(resultContent.Education),
+      experienceMatchPercentage: parsePercentage(resultContent.Relevance),
+      keyPhrases: resultContent.keyPhrases || [
+        "No key phrases provided by the analysis service"
+      ]
+    };
   } catch (error) {
     console.error("Error analyzing resume with OpenAI:", error);
     
