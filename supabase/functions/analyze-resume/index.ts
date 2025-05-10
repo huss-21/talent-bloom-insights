@@ -32,7 +32,7 @@ After analyzing, provide a JSON object with the following structure:
     "Relevance": XX,
     "Overall": XX
 }
-where XX is the percentage match for each category (an integer between 0 and 100).
+where XX is the percentage match for each category (an integer between 0 and 100, no % sign).
 
 Job Description:
 {{jobDescription}}
@@ -120,6 +120,7 @@ async function analyzeResumeWithOpenAI(resumeText: string, jobDescription: strin
       }
     }
     
+    console.log("Processed analysis:", numericAnalysis);
     return numericAnalysis;
   } catch (error) {
     console.error("Error analyzing resume with OpenAI:", error);
@@ -159,7 +160,7 @@ async function processJobApplication(record: any, supabase: any): Promise<void> 
     
     console.log("Analysis result:", analysisResult);
     
-    // Update the record in Supabase
+    // Update the record in Supabase with integers, not strings with % sign
     const { error: updateError } = await supabase
       .from("job_applications")
       .update({

@@ -1,6 +1,4 @@
 
-# This file controls the behavior of the Supabase Edge Functions.
-
 project_id = "zpfssnryuokejdiykwqe"
 
 [functions.analyze-resume]

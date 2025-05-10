@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import axios from 'axios';
 import pdfParse from 'pdf-parse';
@@ -17,20 +18,20 @@ Soft Skills: Identify qualities such as communication, teamwork, leadership, ada
 Certifications: Check for any professional certifications that support the job function (e.g., PMP for project managers, CPA for accountants, HR certificates for HR roles). Certifications reflect a commitment to development and industry standards.
 Language Proficiency: Consider both written and spoken proficiency in relevant languages. This is particularly important for client-facing, administrative, or regional roles.
 Achievements & Awards: Look for quantifiable achievements (e.g., sales targets exceeded, process improvements implemented, employee of the month awards) and recognitions that indicate exceptional performance.
-Relevance to Role: Determine how well the candidate’s profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
-Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here..`;
+Relevance to Role: Determine how well the candidate's profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
+Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here.`;
 
         static user: string = `
 Analyze this resume against the provided job description based on the criteria specified in the system prompt.
 
 After analyzing, provide a JSON object with the following structure:
 {
-    "Skills": "XX%",
-    "Education": "XX%",
-    "Relevance": "XX%",
-    "Overall": "XX%"
+    "Skills": XX,
+    "Education": XX,
+    "Relevance": XX,
+    "Overall": XX
 }
-where "XX%" is the percentage match for each category.
+where XX is the percentage match for each category (an integer between 0 and 100, no % sign).
 
 Job Description:
 {{jobDescription}}
@@ -46,26 +47,42 @@ async function extract_text_from_pdf(pdf_bytes: Buffer): Promise<string> {
     return pdf.text || "";
 }
 
-async function analyze_resume_with_openai(resume_text: string, job_description: string, api_key: string): Promise<{ Skills: string; Education: string; Relevance: string; Overall: string }> {
+async function analyze_resume_with_openai(resume_text: string, job_description: string, api_key: string): Promise<{ Skills: number; Education: number; Relevance: number; Overall: number }> {
     const user_prompt: string = LLMConfig.Prompts.user.replace("{{jobDescription}}", job_description).replace("{{resumeText}}", resume_text);
-    const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
-        {
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: LLMConfig.Prompts.system },
-                { role: "user", content: user_prompt }
-            ]
-        },
-        {
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${api_key}`
+    try {
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: LLMConfig.Prompts.system },
+                    { role: "user", content: user_prompt }
+                ]
+            },
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${api_key}`
+                }
             }
-        }
-    );
-    const content: string = response.data.choices[0].message.content;
-    return JSON.parse(content);
+        );
+        
+        const content: string = response.data.choices[0].message.content;
+        console.log("OpenAI response:", content);
+        
+        const result = JSON.parse(content);
+        
+        // Ensure we have numeric values
+        return {
+            Skills: typeof result.Skills === 'number' ? result.Skills : parseInt(result.Skills),
+            Education: typeof result.Education === 'number' ? result.Education : parseInt(result.Education),
+            Relevance: typeof result.Relevance === 'number' ? result.Relevance : parseInt(result.Relevance),
+            Overall: typeof result.Overall === 'number' ? result.Overall : parseInt(result.Overall)
+        };
+    } catch (error) {
+        console.error("Error in OpenAI analysis:", error);
+        throw error;
+    }
 }
 
 export async function process_job_application(request: Request, response: Response): Promise<void> {
@@ -79,40 +96,59 @@ export async function process_job_application(request: Request, response: Respon
 
     try {
         // Parse webhook payload
-        const data: { record: { id: string; resume_url: string; job_description: string } } = request.body;
-        const new_record = data.record;
-        const application_id: string = new_record.id;
-        const resume_path: string = new_record.resume_url;
-        const job_description: string = new_record.job_description;
+        const data = request.body;
+        const record = data.record;
+        const application_id: string = record.id;
+        const resume_path: string = record.resume_file_path;
+        const job_description: string = record.job_description;
+
+        console.log(`Processing application ID: ${application_id}, Resume path: ${resume_path}`);
+        
+        if (!resume_path || !job_description) {
+            throw new Error("Missing required fields: resume_path or job_description");
+        }
 
         // Get environment variables
-        const supabase_url: string = process.env['https://zpfssnryuokejdiykwqe.supabase.co']!;
-        const supabase_key: string = process.env['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZnNzbnJ5dW9rZWpkaXlrd3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2NTU1NDQsImV4cCI6MjA2MjIzMTU0NH0.3XEmvP2NiByLtEqGbkq8q5s-caOMC8WIE38nR-mNCrM']!;
-        const openai_api_key: string = process.env['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']!;
+        const supabase_url: string = process.env['SUPABASE_URL'] || "https://zpfssnryuokejdiykwqe.supabase.co";
+        const supabase_key: string = process.env['SUPABASE_SERVICE_ROLE_KEY'] || "";
+        const openai_api_key: string = process.env['OPENAI_API_KEY'] || "";
+        
+        if (!supabase_key || !openai_api_key) {
+            throw new Error("Missing required environment variables: SUPABASE_SERVICE_ROLE_KEY or OPENAI_API_KEY");
+        }
 
         // Initialize Supabase client
         const supabase: SupabaseClient = createClient(supabase_url, supabase_key);
 
         // Download resume from Supabase Storage
-        const { data: pdf_bytes } = await supabase.storage.from(STORAGE_BUCKET_NAME).download(resume_path);
+        console.log(`Downloading resume from ${STORAGE_BUCKET_NAME}/${resume_path}`);
+        const { data: pdf_bytes, error: downloadError } = await supabase.storage
+            .from(STORAGE_BUCKET_NAME)
+            .download(resume_path);
 
+        if (downloadError || !pdf_bytes) {
+            throw new Error(`Error downloading resume: ${downloadError?.message || "No data returned"}`);
+        }
+        
         // Extract text from the resume PDF
-        const resume_text: string = await extract_text_from_pdf(pdf_bytes as Buffer);
+        const resume_text: string = await extract_text_from_pdf(pdf_bytes);
+        console.log(`Extracted text from resume (length: ${resume_text.length})`);
 
         // Analyze resume using OpenAI
         const analysis_result = await analyze_resume_with_openai(resume_text, job_description, openai_api_key);
+        console.log("Analysis result:", analysis_result);
 
-        // Update the record in Supabase
-        await supabase.from("job_applications").update({
-            Skills: analysis_result.Skills,
-            Education: analysis_result.Education,
-            Relevance: analysis_result.Relevance,
-            Overall: analysis_result.Overall
-        }).eq("id", application_id);
-
-        response.status(200).send("Success");
+        // Return the result back to the webhook
+        response.status(200).json({
+            success: true,
+            message: "Resume analyzed successfully",
+            analysis_result: analysis_result
+        });
     } catch (e: any) {
         console.error(`Error: ${e.message}`);
-        response.status(500).send("Error");
+        response.status(500).json({
+            success: false,
+            error: e.message
+        });
     }
 }

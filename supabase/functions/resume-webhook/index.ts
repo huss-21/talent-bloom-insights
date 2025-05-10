@@ -62,9 +62,11 @@ serve(async (req) => {
         "Authorization": `Bearer ${WEBHOOK_SECRET}`
       },
       body: JSON.stringify({
-        record: record,
-        supabaseUrl: supabaseUrl,
-        supabaseKey: supabaseKey // Be careful with this in production!
+        record: {
+          id: record.id,
+          resume_file_path: record.resume_file_path,
+          job_description: record.job_description
+        }
       })
     });
     
@@ -73,11 +75,57 @@ serve(async (req) => {
       throw new Error(`Python service error: ${response.status} ${errorText}`);
     }
     
-    const result = await response.json();
-    console.log("Python service response:", result);
+    const pythonResponse = await response.json();
+    console.log("Python service response:", pythonResponse);
+    
+    // Check if Python service returned analysis results
+    if (pythonResponse.analysis_result) {
+      const analysis = pythonResponse.analysis_result;
+      console.log("Received analysis from Python service:", analysis);
+      
+      // Extract percentage values and convert to integers
+      const skillsValue = typeof analysis.Skills === 'string' ? 
+        parseInt(analysis.Skills.replace('%', ''), 10) : 
+        analysis.Skills;
+      
+      const educationValue = typeof analysis.Education === 'string' ? 
+        parseInt(analysis.Education.replace('%', ''), 10) : 
+        analysis.Education;
+      
+      const relevanceValue = typeof analysis.Relevance === 'string' ? 
+        parseInt(analysis.Relevance.replace('%', ''), 10) : 
+        analysis.Relevance;
+      
+      const overallValue = typeof analysis.Overall === 'string' ? 
+        parseInt(analysis.Overall.replace('%', ''), 10) : 
+        analysis.Overall;
+      
+      // Update the job application with analysis results
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { error: updateError } = await supabase
+        .from("job_applications")
+        .update({
+          Skills: skillsValue,
+          Education: educationValue,
+          Relevance: relevanceValue,
+          Overall: overallValue,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", record.id);
+      
+      if (updateError) {
+        console.error("Error updating job application:", updateError);
+        throw new Error(`Failed to update job application: ${updateError.message}`);
+      }
+      
+      console.log("Successfully updated job application with analysis results");
+    }
     
     return new Response(
-      JSON.stringify({ message: "Job application forwarded to Python service", result }),
+      JSON.stringify({ 
+        message: "Job application forwarded to Python service", 
+        result: pythonResponse 
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     
