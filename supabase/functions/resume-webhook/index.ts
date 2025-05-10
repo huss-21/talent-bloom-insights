@@ -3,6 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0";
 
+// Environment variables - these need to be set in your Supabase dashboard
 const PYTHON_SERVICE_URL = Deno.env.get("PYTHON_SERVICE_URL") || "";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") || "";
 
@@ -53,6 +54,8 @@ serve(async (req) => {
       throw new Error("Python service URL not configured");
     }
     
+    console.log(`Record ID: ${record.id}, Resume path: ${record.resume_file_path}, Job description length: ${record.job_description?.length || 0}`);
+    
     // Forward the data to your Python service
     console.log("Forwarding to Python service:", PYTHON_SERVICE_URL);
     const response = await fetch(PYTHON_SERVICE_URL, {
@@ -83,22 +86,22 @@ serve(async (req) => {
       const analysis = pythonResponse.analysis_result;
       console.log("Received analysis from Python service:", analysis);
       
-      // Extract percentage values and convert to integers
-      const skillsValue = typeof analysis.Skills === 'string' ? 
-        parseInt(analysis.Skills.replace('%', ''), 10) : 
-        analysis.Skills;
+      // Extract percentage values
+      const skillsValue = typeof analysis.Skills === 'number' ? 
+        analysis.Skills : 
+        parseInt(String(analysis.Skills).replace('%', ''), 10);
       
-      const educationValue = typeof analysis.Education === 'string' ? 
-        parseInt(analysis.Education.replace('%', ''), 10) : 
-        analysis.Education;
+      const educationValue = typeof analysis.Education === 'number' ? 
+        analysis.Education : 
+        parseInt(String(analysis.Education).replace('%', ''), 10);
       
-      const relevanceValue = typeof analysis.Relevance === 'string' ? 
-        parseInt(analysis.Relevance.replace('%', ''), 10) : 
-        analysis.Relevance;
+      const relevanceValue = typeof analysis.Relevance === 'number' ? 
+        analysis.Relevance : 
+        parseInt(String(analysis.Relevance).replace('%', ''), 10);
       
-      const overallValue = typeof analysis.Overall === 'string' ? 
-        parseInt(analysis.Overall.replace('%', ''), 10) : 
-        analysis.Overall;
+      const overallValue = typeof analysis.Overall === 'number' ? 
+        analysis.Overall : 
+        parseInt(String(analysis.Overall).replace('%', ''), 10);
       
       // Update the job application with analysis results
       const supabase = createClient(supabaseUrl, supabaseKey);
@@ -119,6 +122,8 @@ serve(async (req) => {
       }
       
       console.log("Successfully updated job application with analysis results");
+    } else {
+      console.log("No analysis results received from Python service");
     }
     
     return new Response(

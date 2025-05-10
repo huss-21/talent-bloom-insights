@@ -1,18 +1,16 @@
+
 import os
 import json
 import requests
-from supabase import create_client, Client
+from supabase import create_client
 import pdfplumber
 import io
-
-# NEW: Import asyncio and async Supabase client for Realtime
-import asyncio
-from supabase import AsyncClient, create_async_client
-
-# NEW: Import dotenv to load environment variables
 from dotenv import load_dotenv
+
+# Load environment variables from .env file
 load_dotenv()
 
+# Constants
 STORAGE_BUCKET_NAME = "resumes"
 
 class LLMConfig:
@@ -27,19 +25,19 @@ Soft Skills: Identify qualities such as communication, teamwork, leadership, ada
 Certifications: Check for any professional certifications that support the job function (e.g., PMP for project managers, CPA for accountants, HR certificates for HR roles). Certifications reflect a commitment to development and industry standards.
 Language Proficiency: Consider both written and spoken proficiency in relevant languages. This is particularly important for client-facing, administrative, or regional roles.
 Achievements & Awards: Look for quantifiable achievements (e.g., sales targets exceeded, process improvements implemented, employee of the month awards) and recognitions that indicate exceptional performance.
-Relevance to Role: Determine how well the candidate’s profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
-Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here.."""
+Relevance to Role: Determine how well the candidate's profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
+Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here."""
         user = """
 Analyze this resume against the provided job description based on the criteria specified in the system prompt.
 
 After analyzing, provide a JSON object with the following structure:
 {
-    "Skills": "XX%",
-    "Education": "XX%",
-    "Relevance": "XX%",
-    "Overall": "XX%"
+    "Skills": XX,
+    "Education": XX,
+    "Relevance": XX,
+    "Overall": XX
 }
-where "XX%" is the percentage match for each category.
+where XX is the percentage match for each category (an integer between 0 and 100, no % sign).
 
 Job Description:
 {{jobDescription}}
@@ -57,108 +55,121 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
 
 def analyze_resume_with_openai(resume_text: str, job_description: str, api_key: str) -> dict:
     user_prompt = LLMConfig.Prompts.user.replace("{{jobDescription}}", job_description).replace("{{resumeText}}", resume_text)
-    response = requests.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        },
-        json={
-            "model": "gpt-4o",
-            "messages": [
-                {"role": "system", "content": LLMConfig.Prompts.system},
-                {"role": "user", "content": user_prompt}
-            ]
+    
+    try:
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            },
+            json={
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "system", "content": LLMConfig.Prompts.system},
+                    {"role": "user", "content": user_prompt}
+                ]
+            }
+        )
+        response.raise_for_status()
+        result = response.json()
+        content = result["choices"][0]["message"]["content"]
+        print(f"OpenAI response: {content}")
+        
+        # Parse the JSON response
+        parsed_result = json.loads(content)
+        
+        # Ensure we have numeric values (remove any % signs and convert to integers)
+        return {
+            "Skills": int(str(parsed_result["Skills"]).replace("%", "")),
+            "Education": int(str(parsed_result["Education"]).replace("%", "")),
+            "Relevance": int(str(parsed_result["Relevance"]).replace("%", "")),
+            "Overall": int(str(parsed_result["Overall"]).replace("%", ""))
         }
-    )
-    response.raise_for_status()
-    result = response.json()
-    content = result["choices"][0]["message"]["content"]
-    return json.loads(content)
+    except Exception as e:
+        print(f"Error in OpenAI analysis: {str(e)}")
+        raise e
 
 def process_job_application(request):
     # Verify webhook secret (optional security)
     expected_secret = os.environ.get('WEBHOOK_SECRET')
     auth_header = request.headers.get('Authorization')
     if expected_secret and (not auth_header or auth_header != f"Bearer {expected_secret}"):
-        return "Unauthorized", 401
+        return {"error": "Unauthorized"}, 401
 
     try:
         # Parse webhook payload
         data = request.get_json()
-        new_record = data['record']
-        application_id = new_record['id']
-        resume_path = new_record['resume_url']
-        job_description = new_record['job_description']
+        record = data['record']
+        application_id = record['id']
+        resume_path = record['resume_file_path']
+        job_description = record['job_description']
+        
+        print(f"Processing application ID: {application_id}, Resume path: {resume_path}")
+        
+        if not resume_path or not job_description:
+            raise Exception("Missing required fields: resume_path or job_description")
 
         # Get environment variables
-        supabase_url = os.environ['https://zpfssnryuokejdiykwqe.supabase.co']
-        supabase_key = os.environ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZnNzbnJ5dW9rZWpkaXlrd3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2NTU1NDQsImV4cCI6MjA2MjIzMTU0NH0.3XEmvP2NiByLtEqGbkq8q5s-caOMC8WIE38nR-mNCrM']
-        openai_api_key = os.environ['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']
+        supabase_url = os.environ.get('SUPABASE_URL', 'https://zpfssnryuokejdiykwqe.supabase.co')
+        supabase_key = os.environ.get('SUPABASE_KEY')
+        openai_api_key = os.environ.get('OPENAI_API_KEY')
+        
+        if not supabase_key or not openai_api_key:
+            raise Exception("Missing required environment variables: SUPABASE_KEY or OPENAI_API_KEY")
 
         # Initialize Supabase client
         supabase = create_client(supabase_url, supabase_key)
 
         # Download resume from Supabase Storage
-        pdf_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(resume_path)
-
+        print(f"Downloading resume from {STORAGE_BUCKET_NAME}/{resume_path}")
+        response = supabase.storage.from_(STORAGE_BUCKET_NAME).download(resume_path)
+        
+        if not response:
+            raise Exception("Error downloading resume: No data returned")
+        
         # Extract text from the resume PDF
-        resume_text = extract_text_from_pdf(pdf_bytes)
+        resume_text = extract_text_from_pdf(response)
+        print(f"Extracted text from resume (length: {len(resume_text)})")
 
         # Analyze resume using OpenAI
         analysis_result = analyze_resume_with_openai(resume_text, job_description, openai_api_key)
+        print(f"Analysis result: {analysis_result}")
 
-        # Update the record in Supabase
-        supabase.table("job_applications").update({
+        # Update the record in Supabase with the analysis results
+        update_result = supabase.table("job_applications").update({
             "Skills": analysis_result["Skills"],
             "Education": analysis_result["Education"],
             "Relevance": analysis_result["Relevance"],
-            "Overall": analysis_result["Overall"]
+            "Overall": analysis_result["Overall"],
+            "updated_at": supabase.table("job_applications").rpc("now").execute().data[0]
         }).eq("id", application_id).execute()
+        
+        print(f"Update result: {update_result}")
 
-        return "Success", 200
+        return {
+            "success": True,
+            "message": "Resume analyzed successfully",
+            "analysis_result": analysis_result
+        }, 200
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        return "Error", 500
+        return {
+            "success": False,
+            "error": str(e)
+        }, 500
 
-# NEW: Async function to process new application from Realtime event
-async def process_new_application(supabase: AsyncClient, new_record):
-    try:
-        application_id = new_record['id']
-        resume_path = new_record['resume_url']
-        job_description = new_record['job_description']
-        openai_api_key = os.environ['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']
-
-        # Download resume from Supabase Storage (async)
-        response = await supabase.storage.from_(STORAGE_BUCKET_NAME).download(resume_path)
-        pdf_bytes = response
-
-        # Extract text from the resume PDF (synchronous, as it doesn't need to be async)
-        resume_text = extract_text_from_pdf(pdf_bytes)
-
-        # Analyze resume using OpenAI (synchronous, as it uses requests)
-        analysis_result = analyze_resume_with_openai(resume_text, job_description, openai_api_key)
-
-        # Update the record in Supabase (async)
-        await supabase.table("job_applications").update({
-            "Skills": analysis_result["Skills"],
-            "Education": analysis_result["Education"],
-            "Relevance": analysis_result["Relevance"],
-            "Overall": analysis_result["Overall"]
-        }).eq("id", application_id).execute()
-
-    except Exception as e:
-        print(f"Error processing application {new_record['id']}: {str(e)}")
-
-# NEW: Async function to set up Realtime subscription
-async def setup_realtime_subscription():
-    try:
-        # Use the same environment variable keys as the original script
-        supabase_url = os.environ['https://zpfssnryuokejdiykwqe.supabase.co']
-        supabase_key = os.environ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZnNzbnJ5dW9rZWpkaXlrd3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2NTU1NDQsImV4cCI6MjA2MjIzMTU0NH0.3XEmvP2NiByLtEqGbkq8q5s-caOMC8WIE38nR-mNCrM']
-    except KeyError as e:
-        print(f"Environment variable missing: {e}. Please set the required environment variables.")
-        print("Required variables:")
-        print("- https://zpfssnryuokejdiykwqe.supabase.co")
-        print("- eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZnNzbnJ5dW9rZWpkaXlrd3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2NTU1NDQsImV4cCI6MjA2MjIzMTU0NH0.3XEmvP2NiByLtEqGbkq8")
+# Set up a Flask server to listen for webhook events when run directly
+if __name__ == "__main__":
+    from flask import Flask, request, jsonify
+    
+    app = Flask(__name__)
+    
+    @app.route('/process-application', methods=['POST'])
+    def webhook_handler():
+        result, status_code = process_job_application(request)
+        return jsonify(result), status_code
+    
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
