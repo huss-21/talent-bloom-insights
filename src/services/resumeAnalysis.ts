@@ -1,6 +1,7 @@
 
 // LLM Configuration for resume analysis
 import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 // Export LLMSettings (previously LLMConfig) to avoid naming conflict with the component
 export const LLMSettings = {
@@ -76,21 +77,99 @@ LLMSettings.prompts.system = LLMSettings.Prompts.system;
 LLMSettings.prompts.user = LLMSettings.Prompts.user;
 
 /**
- * This is a browser-compatible version of the resume analysis functionality.
- * The actual processing happens in the Python service and Edge Function.
- * This module provides the frontend configuration for the LLM settings.
+ * This function uploads a resume file to Supabase storage and creates a job application record.
+ * The webhook will then trigger the resume analysis process.
  */
-export async function analyzeResume(resumeFile: File, jobDescription: string): Promise<any> {
-  // In the browser, we can't directly process the PDF or call OpenAI
-  // Instead, we would upload the resume and let the backend handle the processing
-  console.log("Resume analysis requested for:", resumeFile.name);
-  
-  // This function would typically upload the file to Supabase storage
-  // and create a job_applications entry to trigger the webhook
-  
-  // This is a stub implementation
-  return {
-    message: "Resume submitted for analysis",
-    status: "processing"
-  };
+export async function analyzeResume(resumeFile: File, jobDescription: string, userId: string, jobId: string, fullName: string, email: string): Promise<any> {
+  try {
+    console.log("Resume analysis requested for:", resumeFile.name);
+    
+    // 1. Upload the file to Supabase Storage
+    const filePath = `${userId}/${crypto.randomUUID()}.pdf`;
+    const { data: fileData, error: uploadError } = await supabase
+      .storage
+      .from('resumes')
+      .upload(filePath, resumeFile);
+    
+    if (uploadError) {
+      throw uploadError;
+    }
+    
+    console.log("File uploaded successfully:", filePath);
+    
+    // 2. Get the public URL of the file
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('resumes')
+      .getPublicUrl(filePath);
+    
+    // 3. Create a job application record to trigger the webhook
+    const { data, error } = await supabase
+      .from('job_applications')
+      .insert({
+        user_id: userId,
+        job_id: jobId,
+        full_name: fullName,
+        email: email,
+        resume_file_path: filePath,
+        resume_file_name: resumeFile.name,
+        resume_url: publicUrl,
+        job_description: jobDescription
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    console.log("Job application created to trigger analysis:", data.id);
+    
+    return {
+      message: "Resume submitted for analysis",
+      status: "processing",
+      applicationId: data.id
+    };
+    
+  } catch (error) {
+    console.error("Error in analyzeResume:", error);
+    throw error;
+  }
+}
+
+/**
+ * Check the status of a resume analysis by looking up the job application
+ * and checking if the Skills, Education, Relevance, and Overall fields are populated.
+ */
+export async function checkResumeAnalysisStatus(applicationId: string): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('job_applications')
+      .select('Skills, Education, Relevance, Overall, updated_at')
+      .eq('id', applicationId)
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    const isComplete = data.Skills !== null && 
+                       data.Education !== null && 
+                       data.Relevance !== null && 
+                       data.Overall !== null;
+    
+    return {
+      status: isComplete ? "complete" : "processing",
+      results: isComplete ? {
+        Skills: data.Skills,
+        Education: data.Education,
+        Relevance: data.Relevance,
+        Overall: data.Overall
+      } : null,
+      lastUpdated: data.updated_at
+    };
+  } catch (error) {
+    console.error("Error checking analysis status:", error);
+    throw error;
+  }
 }

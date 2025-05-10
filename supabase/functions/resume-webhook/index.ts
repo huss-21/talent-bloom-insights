@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0";
@@ -6,6 +5,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0";
 // Environment variables - these need to be set in your Supabase dashboard
 const PYTHON_SERVICE_URL = Deno.env.get("PYTHON_SERVICE_URL") || "";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://zpfssnryuokejdiykwqe.supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 // CORS headers
 const corsHeaders = {
@@ -43,20 +44,51 @@ serve(async (req) => {
     const record = body.record;
     
     // Initialize Supabase client
-    const supabaseUrl = "https://zpfssnryuokejdiykwqe.supabase.co";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    
-    if (!supabaseKey) {
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase service role key not configured");
     }
     
     if (!PYTHON_SERVICE_URL) {
-      throw new Error("Python service URL not configured");
+      console.log("Python service URL not configured. Using analyze-resume edge function as fallback");
+      
+      // Call analyze-resume function directly if PYTHON_SERVICE_URL is not available
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        
+        // Create payload for analyze-resume function
+        const analyzePayload = {
+          record: {
+            id: record.id,
+            resume_file_path: record.resume_file_path,
+            job_description: record.job_description
+          }
+        };
+        
+        // Call the analyze-resume edge function
+        const { data, error } = await supabase.functions.invoke("analyze-resume", {
+          body: analyzePayload
+        });
+        
+        if (error) {
+          throw new Error(`Error calling analyze-resume function: ${error.message}`);
+        }
+        
+        console.log("analyze-resume function response:", data);
+        
+        return new Response(
+          JSON.stringify({ 
+            message: "Job application processed through analyze-resume function", 
+            result: data
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (fnError) {
+        console.error("Error invoking analyze-resume function:", fnError);
+        throw fnError;
+      }
     }
     
-    console.log(`Record ID: ${record.id}, Resume path: ${record.resume_file_path}, Job description length: ${record.job_description?.length || 0}`);
-    
-    // Forward the data to your Python service
+    // Otherwise, forward the data to Python service
     console.log("Forwarding to Python service:", PYTHON_SERVICE_URL);
     const response = await fetch(PYTHON_SERVICE_URL, {
       method: "POST",
@@ -104,7 +136,7 @@ serve(async (req) => {
         parseInt(String(analysis.Overall).replace('%', ''), 10);
       
       // Update the job application with analysis results
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const { error: updateError } = await supabase
         .from("job_applications")
         .update({
