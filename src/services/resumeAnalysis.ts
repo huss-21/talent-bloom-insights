@@ -1,31 +1,13 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import axios from 'axios';
+import pdfParse from 'pdf-parse';
+import { Request, Response } from 'express';
 
-/**
- * Service for analyzing resumes against job criteria using LLM APIs
- */
+const STORAGE_BUCKET_NAME: string = "resumes";
 
-import { Rating } from "@/types";
-
-// Configuration object for LLM settings
-export const LLMConfig = {
-  openAI: {
-    apiKey: localStorage.getItem('openai_api_key') || "",
-    model: "gpt-4o",
-    setApiKey: (key: string) => {
-      localStorage.setItem('openai_api_key', key);
-      LLMConfig.openAI.apiKey = key;
-    }
-  },
-  bedrock: {
-    apiKey: localStorage.getItem('aws_bedrock_api_key') || "",
-    model: "amazon.titan-text-express-v1",
-    setApiKey: (key: string) => {
-      localStorage.setItem('aws_bedrock_api_key', key);
-      LLMConfig.bedrock.apiKey = key;
-    }
-  },
-  // Customizable system and user prompt templates for resume analysis
-  prompts: {
-    system: `You are an expert talent acquisition leader that evaluates candidates by comparing their resumes to the job description 
+class LLMConfig {
+    static Prompts = class {
+        static system: string = `You are an expert talent acquisition leader that evaluates candidates by comparing their resumes to the job description 
 Based on the following criteria:
 
 Education: Assess the relevance and level of academic qualifications (e.g., diploma, bachelor's, master's, PhD) to the job. Also consider the reputation of the institution and the field of study. For general roles, fields like Business, Communication, Finance, or relevant disciplines are considered.
@@ -35,221 +17,102 @@ Soft Skills: Identify qualities such as communication, teamwork, leadership, ada
 Certifications: Check for any professional certifications that support the job function (e.g., PMP for project managers, CPA for accountants, HR certificates for HR roles). Certifications reflect a commitment to development and industry standards.
 Language Proficiency: Consider both written and spoken proficiency in relevant languages. This is particularly important for client-facing, administrative, or regional roles.
 Achievements & Awards: Look for quantifiable achievements (e.g., sales targets exceeded, process improvements implemented, employee of the month awards) and recognitions that indicate exceptional performance.
-Relevance to Role: Determine how well the candidate's profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
-Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here.`,
-    user: `
+Relevance to Role: Determine how well the candidate’s profile aligns with the job description. This includes experience, skills, and any extras that would add value to the role.
+Overall Impression: Use a holistic view of the application to gauge suitability, motivation, and overall potential for success in the role. Combine your evaluation from all other categories here..`;
+
+        static user: string = `
 Analyze this resume against the provided job description based on the criteria specified in the system prompt.
 
 After analyzing, provide a JSON object with the following structure:
 {
-    "Skills": XX,
-    "Education": XX,
-    "Relevance": XX,
-    "Overall": XX
+    "Skills": "XX%",
+    "Education": "XX%",
+    "Relevance": "XX%",
+    "Overall": "XX%"
 }
-where XX is the percentage match for each category (an integer between 0 and 100).
+where "XX%" is the percentage match for each category.
 
 Job Description:
-{jobDescription}
+{{jobDescription}}
 
 Resume Text:
-{resumeText}
-    `,
-    // Method to update prompts if needed
-    updatePrompts: (system?: string, user?: string) => {
-      if (system) LLMConfig.prompts.system = system;
-      if (user) LLMConfig.prompts.user = user;
-    }
-  }
-};
-
-/**
- * Extract text from a PDF file
- * Note: This is a mock implementation. In a real application, you would use
- * a library like pdf.js or a server-side solution.
- */
-export async function extractTextFromPDF(pdfFile: File): Promise<string> {
-  // Mock implementation - in a real app, use pdf.js or similar
-  console.log("Extracting text from PDF:", pdfFile.name);
-  return "Mock resume text extraction. In a real implementation, this would contain the full text extracted from the PDF file.";
+{{resumeText}}
+`;
+    };
 }
 
-/**
- * Interface for LLM analysis response
- */
-export interface ResumeAnalysisResult {
-  criteriaScores: Record<string, number>;
-  overallMatchPercentage: number;
-  skillsMatchPercentage: number;
-  educationMatchPercentage: number;
-  experienceMatchPercentage: number;
-  keyPhrases: string[];
+async function extract_text_from_pdf(pdf_bytes: Buffer): Promise<string> {
+    const pdf = await pdfParse(pdf_bytes);
+    return pdf.text || "";
 }
 
-/**
- * Prepare prompt by replacing template variables with actual values
- */
-function preparePrompt(template: string, variables: Record<string, any>): string {
-  let prompt = template;
-  Object.entries(variables).forEach(([key, value]) => {
-    prompt = prompt.replace(`{${key}}`, JSON.stringify(value));
-  });
-  return prompt;
+async function analyze_resume_with_openai(resume_text: string, job_description: string, api_key: string): Promise<{ Skills: string; Education: string; Relevance: string; Overall: string }> {
+    const user_prompt: string = LLMConfig.Prompts.user.replace("{{jobDescription}}", job_description).replace("{{resumeText}}", resume_text);
+    const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+            model: "gpt-4o",
+            messages: [
+                { role: "system", content: LLMConfig.Prompts.system },
+                { role: "user", content: user_prompt }
+            ]
+        },
+        {
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${api_key}`
+            }
+        }
+    );
+    const content: string = response.data.choices[0].message.content;
+    return JSON.parse(content);
 }
 
-/**
- * Analyze resume text against job criteria using OpenAI API
- */
-export async function analyzeResumeWithOpenAI(
-  resumeText: string,
-  jobCriteria: Record<string, number>
-): Promise<ResumeAnalysisResult> {
-  console.log("Analyzing resume with OpenAI:", resumeText.substring(0, 100) + "...");
-  
-  try {
-    if (!LLMConfig.openAI.apiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
-    
-    const userPrompt = preparePrompt(LLMConfig.prompts.user, {
-      jobCriteria,
-      resumeText
-    });
-    
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${LLMConfig.openAI.apiKey}`
-      },
-      body: JSON.stringify({
-        model: LLMConfig.openAI.model,
-        messages: [
-          {
-            role: "system",
-            content: LLMConfig.prompts.system
-          },
-          {
-            role: "user",
-            content: userPrompt
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+export async function process_job_application(request: Request, response: Response): Promise<void> {
+    // Verify webhook secret (optional security)
+    const expected_secret: string | undefined = process.env['WEBHOOK_SECRET'];
+    const auth_header: string | undefined = request.headers['authorization'];
+    if (expected_secret && (!auth_header || auth_header !== `Bearer ${expected_secret}`)) {
+        response.status(401).send("Unauthorized");
+        return;
     }
 
-    const result = await response.json();
-    
-    // The Python service returns a different format, so we need to adapt
-    const resultContent = JSON.parse(result.choices[0].message.content);
-    
-    // In case the Python service returns percentage strings with % sign
-    const parsePercentage = (value: string | number): number => {
-      if (typeof value === 'string') {
-        return parseInt(value.replace('%', ''), 10);
-      }
-      return value as number;
-    };
-    
-    // Convert to our frontend expected format
-    return {
-      criteriaScores: {
-        "Skills": parsePercentage(resultContent.Skills),
-        "Education": parsePercentage(resultContent.Education),
-        "Relevance": parsePercentage(resultContent.Relevance),
-      },
-      overallMatchPercentage: parsePercentage(resultContent.Overall),
-      skillsMatchPercentage: parsePercentage(resultContent.Skills),
-      educationMatchPercentage: parsePercentage(resultContent.Education),
-      experienceMatchPercentage: parsePercentage(resultContent.Relevance),
-      keyPhrases: resultContent.keyPhrases || [
-        "No key phrases provided by the analysis service"
-      ]
-    };
-  } catch (error) {
-    console.error("Error analyzing resume with OpenAI:", error);
-    
-    // Return mock data for demonstration or if there's an API error
-    return {
-      criteriaScores: Object.fromEntries(
-        Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
-      ),
-      overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
-      skillsMatchPercentage: Math.floor(Math.random() * 30) + 55,
-      educationMatchPercentage: Math.floor(Math.random() * 30) + 65,
-      experienceMatchPercentage: Math.floor(Math.random() * 30) + 70,
-      keyPhrases: [
-        "5 years of relevant experience",
-        "Led cross-functional teams",
-        "Implemented CI/CD pipelines",
-        "Reduced processing time by 30%"
-      ]
-    };
-  }
-}
+    try {
+        // Parse webhook payload
+        const data: { record: { id: string; resume_url: string; job_description: string } } = request.body;
+        const new_record = data.record;
+        const application_id: string = new_record.id;
+        const resume_path: string = new_record.resume_url;
+        const job_description: string = new_record.job_description;
 
-/**
- * Analyze resume text against job criteria using AWS Bedrock API
- */
-export async function analyzeResumeWithBedrock(
-  resumeText: string,
-  jobCriteria: Record<string, number>
-): Promise<ResumeAnalysisResult> {
-  console.log("Analyzing resume with AWS Bedrock:", resumeText.substring(0, 100) + "...");
-  
-  try {
-    if (!LLMConfig.bedrock.apiKey) {
-      throw new Error("AWS Bedrock API key not configured");
+        // Get environment variables
+        const supabase_url: string = process.env['https://zpfssnryuokejdiykwqe.supabase.co']!;
+        const supabase_key: string = process.env['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZnNzbnJ5dW9rZWpkaXlrd3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2NTU1NDQsImV4cCI6MjA2MjIzMTU0NH0.3XEmvP2NiByLtEqGbkq8q5s-caOMC8WIE38nR-mNCrM']!;
+        const openai_api_key: string = process.env['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']!;
+
+        // Initialize Supabase client
+        const supabase: SupabaseClient = createClient(supabase_url, supabase_key);
+
+        // Download resume from Supabase Storage
+        const { data: pdf_bytes } = await supabase.storage.from(STORAGE_BUCKET_NAME).download(resume_path);
+
+        // Extract text from the resume PDF
+        const resume_text: string = await extract_text_from_pdf(pdf_bytes as Buffer);
+
+        // Analyze resume using OpenAI
+        const analysis_result = await analyze_resume_with_openai(resume_text, job_description, openai_api_key);
+
+        // Update the record in Supabase
+        await supabase.from("job_applications").update({
+            Skills: analysis_result.Skills,
+            Education: analysis_result.Education,
+            Relevance: analysis_result.Relevance,
+            Overall: analysis_result.Overall
+        }).eq("id", application_id);
+
+        response.status(200).send("Success");
+    } catch (e: any) {
+        console.error(`Error: ${e.message}`);
+        response.status(500).send("Error");
     }
-    
-    const userPrompt = preparePrompt(LLMConfig.prompts.user, {
-      jobCriteria,
-      resumeText
-    });
-    
-    // In a real implementation, replace with actual AWS Bedrock API call
-    // This is a mock implementation
-    
-    // Return mock data for demonstration
-    return {
-      criteriaScores: Object.fromEntries(
-        Object.keys(jobCriteria).map(criterion => [criterion, Math.floor(Math.random() * 30) + 60])
-      ),
-      overallMatchPercentage: Math.floor(Math.random() * 30) + 60,
-      skillsMatchPercentage: Math.floor(Math.random() * 30) + 65,
-      educationMatchPercentage: Math.floor(Math.random() * 30) + 70,
-      experienceMatchPercentage: Math.floor(Math.random() * 30) + 75,
-      keyPhrases: [
-        "Bachelor's degree in Computer Science",
-        "Experience with cloud technologies",
-        "Strong problem-solving abilities",
-        "Excellent communication skills"
-      ]
-    };
-  } catch (error) {
-    console.error("Error analyzing resume with AWS Bedrock:", error);
-    throw error;
-  }
-}
-
-/**
- * Create a rating object from LLM analysis result
- */
-export function createRatingFromAnalysis(
-  applicantId: string,
-  result: ResumeAnalysisResult
-): Omit<Rating, "id" | "createdAt"> {
-  return {
-    applicantId: applicantId,
-    criteriaScores: result.criteriaScores,
-    overallMatchPercentage: result.overallMatchPercentage,
-    skillsMatchPercentage: result.skillsMatchPercentage,
-    educationMatchPercentage: result.educationMatchPercentage,
-    experienceMatchPercentage: result.experienceMatchPercentage,
-    keyPhrases: result.keyPhrases
-  };
 }
