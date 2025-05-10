@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useApplicants } from "@/hooks/useApplicants";
@@ -34,6 +33,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
+import { ApplicantRatingCharts } from "@/components/ApplicantRatingCharts";
 
 const Applicants = () => {
   const { applicants, loading, updateApplicationStatus, getResumeDownloadUrl } = useApplicants();
@@ -189,99 +189,87 @@ const Applicants = () => {
             ) : displayedApplicants.length === 0 ? (
               <div className="text-center py-4">No applicants found</div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>National ID</TableHead>
-                      <TableHead>Job Position</TableHead>
-                      <TableHead>Applied</TableHead>
-                      <TableHead>Match Score</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {displayedApplicants.map((applicant) => {
-                      const job = getJobById(applicant.jobId);
-                      return (
-                        <TableRow key={applicant.id}>
-                          <TableCell>
+              <div className="space-y-8">
+                {displayedApplicants.map((applicant) => {
+                  const job = getJobById(applicant.jobId);
+                  return (
+                    <div key={applicant.id} className="border rounded-lg p-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Applicant Info */}
+                        <div>
+                          <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center">
-                              <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                              <User className="h-5 w-5 mr-2 text-muted-foreground" />
                               <div>
                                 <p className="font-medium">{applicant.fullName}</p>
                                 <p className="text-sm text-muted-foreground">{applicant.email}</p>
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <IdCard className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {applicant.nationalId || "N/A"}
+                            <div>{getStatusBadge(applicant.status)}</div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">National ID</p>
+                              <p className="font-medium">{applicant.nationalId || "N/A"}</p>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            {job ? (
-                              <div>
-                                <p className="font-medium">{job.title}</p>
-                                <p className="text-sm text-muted-foreground">{job.department}</p>
-                              </div>
-                            ) : (
-                              "Unknown job"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {applicant.applicationDate 
-                              ? format(new Date(applicant.applicationDate), "MMM d, yyyy") 
-                              : "Unknown"
-                            }
-                          </TableCell>
-                          <TableCell>
-                            {applicant.matchScore !== null && applicant.matchScore !== undefined ? (
-                              <Badge variant={applicant.matchScore > 70 ? "default" : "outline"} className="font-mono">
-                                {applicant.matchScore}%
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">Not analyzed</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(applicant.status)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDownloadResume(applicant)}
-                                title="Download Resume"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              
-                              <Select
-                                value={applicant.status}
-                                onValueChange={(value) => handleStatusChange(applicant.id, value)}
-                              >
-                                <SelectTrigger className="w-[110px] h-9">
-                                  <SelectValue placeholder="Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="reviewed">Reviewed</SelectItem>
-                                  <SelectItem value="rejected">Rejected</SelectItem>
-                                  <SelectItem value="hired">Hired</SelectItem>
-                                </SelectContent>
-                              </Select>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Applied Date</p>
+                              <p className="font-medium">
+                                {applicant.applicationDate 
+                                  ? format(new Date(applicant.applicationDate), "MMM d, yyyy") 
+                                  : "Unknown"
+                                }
+                              </p>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                          </div>
+                          
+                          <div>
+                            <p className="text-sm text-muted-foreground">Job Position</p>
+                            <p className="font-medium">{job ? job.title : "Unknown job"}</p>
+                            <p className="text-sm text-muted-foreground">{job ? job.department : ""}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Rating Charts */}
+                        <div>
+                          <ApplicantRatingCharts 
+                            skills={applicant.Skills} 
+                            education={applicant.Education}
+                            relevance={applicant.Relevance}
+                            overall={applicant.Overall}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-end gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadResume(applicant)}
+                          title="Download Resume"
+                        >
+                          <Download className="h-4 w-4 mr-1" /> Resume
+                        </Button>
+                        
+                        <Select
+                          value={applicant.status}
+                          onValueChange={(value) => handleStatusChange(applicant.id, value)}
+                        >
+                          <SelectTrigger className="w-[150px] h-9">
+                            <SelectValue placeholder="Update Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="reviewed">Reviewed</SelectItem>
+                            <SelectItem value="rejected">Rejected</SelectItem>
+                            <SelectItem value="hired">Hired</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>

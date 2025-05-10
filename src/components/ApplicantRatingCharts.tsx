@@ -1,30 +1,38 @@
 
 import React from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { Rating } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CirclePercent } from "lucide-react";
 
 interface ApplicantRatingChartsProps {
-  rating: Rating;
+  skills: number | null;
+  education: number | null;
+  relevance: number | null;
+  overall: number | null;
 }
 
 const COLORS = {
-  skills: ['#0088FE', '#AAAAAA'],
+  skills: ['#9b87f5', '#AAAAAA'],
   education: ['#00C49F', '#AAAAAA'],
-  experience: ['#FFBB28', '#AAAAAA'],
+  relevance: ['#FFBB28', '#AAAAAA'],
   overall: ['#FF8042', '#AAAAAA']
 };
 
-export const ApplicantRatingCharts: React.FC<ApplicantRatingChartsProps> = ({ rating }) => {
-  const createPieData = (score: number) => [
-    { name: 'Match', value: score },
-    { name: 'Gap', value: 100 - score },
+export const ApplicantRatingCharts: React.FC<ApplicantRatingChartsProps> = ({ 
+  skills, 
+  education, 
+  relevance, 
+  overall 
+}) => {
+  const createPieData = (score: number | null) => [
+    { name: 'Match', value: score || 0 },
+    { name: 'Gap', value: 100 - (score || 0) },
   ];
 
-  const skillsData = createPieData(rating.skillsMatchPercentage);
-  const educationData = createPieData(rating.educationMatchPercentage);
-  const experienceData = createPieData(rating.experienceMatchPercentage);
-  const overallData = createPieData(rating.overallMatchPercentage);
+  const skillsData = createPieData(skills);
+  const educationData = createPieData(education);
+  const relevanceData = createPieData(relevance);
+  const overallData = createPieData(overall);
 
   const renderChart = (data: any[], colors: string[], title: string) => (
     <Card className="h-full">
@@ -68,10 +76,10 @@ export const ApplicantRatingCharts: React.FC<ApplicantRatingChartsProps> = ({ ra
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
       {renderChart(skillsData, COLORS.skills, 'Skills')}
       {renderChart(educationData, COLORS.education, 'Education')}
-      {renderChart(experienceData, COLORS.experience, 'Experience')}
+      {renderChart(relevanceData, COLORS.relevance, 'Relevance')}
       {renderChart(overallData, COLORS.overall, 'Overall')}
     </div>
   );

@@ -45,6 +45,7 @@ export type Database = {
         Row: {
           applied_at: string
           cover_letter: string | null
+          Education: number | null
           email: string
           full_name: string
           id: string
@@ -52,9 +53,12 @@ export type Database = {
           job_id: string
           match_score: number | null
           national_id: string | null
+          Overall: number | null
+          Relevance: number | null
           resume_file_name: string | null
           resume_file_path: string | null
           resume_url: string | null
+          Skills: number | null
           status: string
           updated_at: string
           user_id: string
@@ -62,6 +66,7 @@ export type Database = {
         Insert: {
           applied_at?: string
           cover_letter?: string | null
+          Education?: number | null
           email: string
           full_name: string
           id?: string
@@ -69,9 +74,12 @@ export type Database = {
           job_id: string
           match_score?: number | null
           national_id?: string | null
+          Overall?: number | null
+          Relevance?: number | null
           resume_file_name?: string | null
           resume_file_path?: string | null
           resume_url?: string | null
+          Skills?: number | null
           status?: string
           updated_at?: string
           user_id: string
@@ -79,6 +87,7 @@ export type Database = {
         Update: {
           applied_at?: string
           cover_letter?: string | null
+          Education?: number | null
           email?: string
           full_name?: string
           id?: string
@@ -86,9 +95,12 @@ export type Database = {
           job_id?: string
           match_score?: number | null
           national_id?: string | null
+          Overall?: number | null
+          Relevance?: number | null
           resume_file_name?: string | null
           resume_file_path?: string | null
           resume_url?: string | null
+          Skills?: number | null
           status?: string
           updated_at?: string
           user_id?: string

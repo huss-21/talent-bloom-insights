@@ -119,6 +119,8 @@ export const useApplicants = () => {
           throw applicationsError;
         }
 
+        console.log("Raw applications data from DB:", applicationsData);
+
         // 2. Transform data to match our Applicant type
         let transformedApplicants: Applicant[] = [];
         
@@ -139,11 +141,15 @@ export const useApplicants = () => {
             applicationDate: app.applied_at,
             status: app.status,
             matchScore: app.match_score,
-            jobDescription: app.job_description || ''
+            jobDescription: app.job_description || '',
+            Skills: app.Skills,
+            Education: app.Education,
+            Relevance: app.Relevance,
+            Overall: app.Overall
           }));
           
           setApplicants(transformedApplicants);
-          console.log("Fetched applications:", transformedApplicants);
+          console.log("Transformed applications:", transformedApplicants);
         }
 
         // 3. Fetch ratings from the database
