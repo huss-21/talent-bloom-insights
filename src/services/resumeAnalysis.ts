@@ -6,7 +6,7 @@ import { Request, Response } from 'express';
 
 const STORAGE_BUCKET_NAME: string = "resumes";
 
-class LLMConfig {
+export class LLMConfig {
     static Prompts = class {
         static system: string = `You are an expert talent acquisition leader that evaluates candidates by comparing their resumes to the job description 
 Based on the following criteria:
@@ -40,10 +40,31 @@ Resume Text:
 {{resumeText}}
 `;
     };
+
+    // Add static properties for API keys
+    static openAI = {
+        apiKey: '',
+        setApiKey: (key: string) => { LLMConfig.openAI.apiKey = key; }
+    };
+
+    static bedrock = {
+        apiKey: '',
+        setApiKey: (key: string) => { LLMConfig.bedrock.apiKey = key; }
+    };
+
+    // Add static properties for prompt manipulation
+    static prompts = {
+        system: LLMConfig.Prompts.system,
+        user: LLMConfig.Prompts.user,
+        updatePrompts: (system: string, user: string) => {
+            LLMConfig.prompts.system = system;
+            LLMConfig.prompts.user = user;
+        }
+    };
 }
 
-async function extract_text_from_pdf(pdf_bytes: Buffer): Promise<string> {
-    const pdf = await pdfParse(pdf_bytes);
+async function extract_text_from_pdf(pdf_bytes: ArrayBuffer): Promise<string> {
+    const pdf = await pdfParse(Buffer.from(pdf_bytes));
     return pdf.text || "";
 }
 
@@ -122,16 +143,19 @@ export async function process_job_application(request: Request, response: Respon
 
         // Download resume from Supabase Storage
         console.log(`Downloading resume from ${STORAGE_BUCKET_NAME}/${resume_path}`);
-        const { data: pdf_bytes, error: downloadError } = await supabase.storage
+        const { data: fileData, error: downloadError } = await supabase.storage
             .from(STORAGE_BUCKET_NAME)
             .download(resume_path);
 
-        if (downloadError || !pdf_bytes) {
+        if (downloadError || !fileData) {
             throw new Error(`Error downloading resume: ${downloadError?.message || "No data returned"}`);
         }
         
+        // Convert Blob to ArrayBuffer
+        const arrayBuffer = await fileData.arrayBuffer();
+        
         // Extract text from the resume PDF
-        const resume_text: string = await extract_text_from_pdf(pdf_bytes);
+        const resume_text: string = await extract_text_from_pdf(arrayBuffer);
         console.log(`Extracted text from resume (length: ${resume_text.length})`);
 
         // Analyze resume using OpenAI

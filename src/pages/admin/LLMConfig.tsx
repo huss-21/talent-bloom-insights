@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,7 +177,7 @@ const LLMConfig = () => {
                       rows={10}
                     />
                     <p className="text-sm text-muted-foreground">
-                      The template can use placeholders like {"{jobCriteria}"} and {"{resumeText}"} which will be replaced with actual values
+                      The template can use placeholders like {"{jobDescription}"} and {"{resumeText}"} which will be replaced with actual values
                     </p>
                   </div>
                 </div>
@@ -198,8 +197,8 @@ const LLMConfig = () => {
               <CardContent>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="font-mono bg-muted p-2 rounded">{"{jobCriteria}"}</div>
-                    <div>The criteria object from the job posting</div>
+                    <div className="font-mono bg-muted p-2 rounded">{"{jobDescription}"}</div>
+                    <div>The job description text</div>
                     
                     <div className="font-mono bg-muted p-2 rounded">{"{resumeText}"}</div>
                     <div>The extracted text from the resume PDF</div>
