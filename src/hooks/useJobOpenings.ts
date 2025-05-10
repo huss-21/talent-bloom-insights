@@ -85,9 +85,7 @@ export const useJobOpenings = () => {
           title: job.title,
           description: job.description,
           department: job.department,
-          criteria: typeof job.skills_and_requirements === 'object' 
-            ? job.skills_and_requirements 
-            : {},
+          criteria: convertSkillsAndRequirements(job.skills_and_requirements),
           status: job.status ? "open" : "closed",
           createdAt: job.created_at,
           updatedAt: job.updated_at
@@ -115,6 +113,27 @@ export const useJobOpenings = () => {
       setLoading(false);
     }
   }, []);
+
+  // Helper function to convert skills_and_requirements from Json to Record<string, number>
+  const convertSkillsAndRequirements = (skills: any): Record<string, number> => {
+    if (!skills) return {};
+    
+    // If it's already an object with string keys and number values
+    if (typeof skills === 'object' && !Array.isArray(skills)) {
+      const result: Record<string, number> = {};
+      
+      // Convert each value to a number if it isn't already
+      Object.entries(skills).forEach(([key, value]) => {
+        result[key] = typeof value === 'number' ? value : 
+                     (typeof value === 'string' ? parseInt(value) || 0 : 0);
+      });
+      
+      return result;
+    }
+    
+    // If it's any other format, return an empty object
+    return {};
+  };
 
   useEffect(() => {
     fetchJobOpenings();
