@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -126,8 +127,9 @@ export const useApplicants = () => {
       console.log("Fetching job applications, attempt:", fetchRetries + 1);
       
       // 1. Fetch job applications from the new table
+      // Add 'as any' type assertion to fix TypeScript errors with Supabase
       const { data: applicationsData, error: applicationsError } = await supabase
-        .from('job_applications')
+        .from('job_applications' as any)
         .select('*')
         .order('applied_at', { ascending: false });
 
@@ -144,7 +146,7 @@ export const useApplicants = () => {
         console.log("No applications found in database, using mock data");
         setApplicants(MOCK_APPLICANTS);
       } else {
-        transformedApplicants = applicationsData.map((app) => ({
+        transformedApplicants = applicationsData.map((app: any) => ({
           id: app.id,
           userId: app.user_id,
           jobId: app.job_id,
@@ -171,7 +173,7 @@ export const useApplicants = () => {
       // 3. Fetch ratings from the database
       console.log("Fetching ratings data");
       const { data: ratingsData, error: ratingsError } = await supabase
-        .from('ratings')
+        .from('ratings' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -184,7 +186,7 @@ export const useApplicants = () => {
         setRatings(MOCK_RATINGS);
       } else {
         // Transform data to match our Rating type
-        const transformedRatings: Rating[] = ratingsData.map((rating) => {
+        const transformedRatings: Rating[] = ratingsData.map((rating: any) => {
           // Parse criteria_scores from JSON if needed
           let criteriaScores: Record<string, number> = {};
           
@@ -301,7 +303,7 @@ export const useApplicants = () => {
       if (!jobDescription) {
         // Fetch the job description from the jobs table
         const { data: jobData, error: jobError } = await supabase
-          .from('jobs')
+          .from('jobs' as any)
           .select('description')
           .eq('id', application.jobId)
           .single();
@@ -315,7 +317,7 @@ export const useApplicants = () => {
       
       // Insert into Supabase
       const { data, error } = await supabase
-        .from('job_applications')
+        .from('job_applications' as any)
         .insert({
           user_id: application.userId,
           job_id: application.jobId,
@@ -340,23 +342,23 @@ export const useApplicants = () => {
 
       // Transform to our Applicant type
       const newApplicant: Applicant = {
-        id: data.id,
-        userId: data.user_id,
-        jobId: data.job_id,
-        fullName: data.full_name,
-        email: data.email,
-        nationalId: data.national_id || '',
-        resumeUrl: data.resume_url || '',
-        resumeFileName: data.resume_file_name || '',
-        resumeFilePath: data.resume_file_path || '',
-        applicationDate: data.applied_at,
-        status: data.status,
-        matchScore: data.match_score,
-        jobDescription: data.job_description || '',
-        Skills: data.Skills || null,
-        Education: data.Education || null,
-        Relevance: data.Relevance || null,
-        Overall: data.Overall || null
+        id: data?.id || '',
+        userId: data?.user_id || '',
+        jobId: data?.job_id || '',
+        fullName: data?.full_name || '',
+        email: data?.email || '',
+        nationalId: data?.national_id || '',
+        resumeUrl: data?.resume_url || '',
+        resumeFileName: data?.resume_file_name || '',
+        resumeFilePath: data?.resume_file_path || '',
+        applicationDate: data?.applied_at || new Date().toISOString(),
+        status: data?.status || 'pending',
+        matchScore: data?.match_score || null,
+        jobDescription: data?.job_description || '',
+        Skills: data?.Skills || null,
+        Education: data?.Education || null,
+        Relevance: data?.Relevance || null,
+        Overall: data?.Overall || null
       };
 
       // Update local state
@@ -377,7 +379,7 @@ export const useApplicants = () => {
   const updateApplicationStatus = async (applicationId: string, status: string) => {
     try {
       const { error } = await supabase
-        .from('job_applications')
+        .from('job_applications' as any)
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', applicationId);
       
@@ -405,7 +407,7 @@ export const useApplicants = () => {
     try {
       // Insert into Supabase
       const { data, error } = await supabase
-        .from('ratings')
+        .from('ratings' as any)
         .insert({
           applicant_id: rating.applicantId,
           criteria_scores: rating.criteriaScores,
@@ -424,15 +426,15 @@ export const useApplicants = () => {
 
       // Transform to our Rating type
       const newRating: Rating = {
-        id: data.id,
-        applicantId: data.applicant_id,
-        criteriaScores: data.criteria_scores as Record<string, number>,
-        overallMatchPercentage: data.overall_match_percentage,
-        skillsMatchPercentage: data.skills_match_percentage,
-        educationMatchPercentage: data.education_match_percentage,
-        experienceMatchPercentage: data.experience_match_percentage,
-        keyPhrases: data.key_phrases,
-        createdAt: data.created_at
+        id: data?.id || '',
+        applicantId: data?.applicant_id || '',
+        criteriaScores: (data?.criteria_scores as Record<string, number>) || {},
+        overallMatchPercentage: data?.overall_match_percentage || 0,
+        skillsMatchPercentage: data?.skills_match_percentage || 0,
+        educationMatchPercentage: data?.education_match_percentage || 0,
+        experienceMatchPercentage: data?.experience_match_percentage || 0,
+        keyPhrases: data?.key_phrases || [],
+        createdAt: data?.created_at || new Date().toISOString()
       };
 
       // Update local state
@@ -440,7 +442,7 @@ export const useApplicants = () => {
       
       // Also update the match score in the job_applications table
       await supabase
-        .from('job_applications')
+        .from('job_applications' as any)
         .update({ 
           match_score: newRating.overallMatchPercentage,
           Skills: newRating.skillsMatchPercentage,

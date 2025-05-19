@@ -9,7 +9,184 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      applicants: {
+        Row: {
+          application_date: string
+          id: string
+          job_id: string
+          resume_url: string
+          user_id: string
+        }
+        Insert: {
+          application_date?: string
+          id?: string
+          job_id: string
+          resume_url: string
+          user_id: string
+        }
+        Update: {
+          application_date?: string
+          id?: string
+          job_id?: string
+          resume_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applicants_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_applications: {
+        Row: {
+          applied_at: string
+          cover_letter: string | null
+          Education: number | null
+          email: string
+          full_name: string
+          id: string
+          job_description: string | null
+          job_id: string
+          match_score: number | null
+          national_id: string | null
+          Overall: number | null
+          Relevance: number | null
+          resume_file_name: string | null
+          resume_file_path: string | null
+          resume_url: string | null
+          Skills: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string
+          cover_letter?: string | null
+          Education?: number | null
+          email: string
+          full_name: string
+          id?: string
+          job_description?: string | null
+          job_id: string
+          match_score?: number | null
+          national_id?: string | null
+          Overall?: number | null
+          Relevance?: number | null
+          resume_file_name?: string | null
+          resume_file_path?: string | null
+          resume_url?: string | null
+          Skills?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applied_at?: string
+          cover_letter?: string | null
+          Education?: number | null
+          email?: string
+          full_name?: string
+          id?: string
+          job_description?: string | null
+          job_id?: string
+          match_score?: number | null
+          national_id?: string | null
+          Overall?: number | null
+          Relevance?: number | null
+          resume_file_name?: string | null
+          resume_file_path?: string | null
+          resume_url?: string | null
+          Skills?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          created_at: string
+          department: string
+          description: string
+          id: string
+          skills_and_requirements: Json
+          status: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department: string
+          description: string
+          id?: string
+          skills_and_requirements?: Json
+          status?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          description?: string
+          id?: string
+          skills_and_requirements?: Json
+          status?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ratings: {
+        Row: {
+          applicant_id: string
+          created_at: string
+          criteria_scores: Json
+          education_match_percentage: number
+          experience_match_percentage: number
+          id: string
+          job_id: string | null
+          key_phrases: string[]
+          overall_match_percentage: number
+          skills_match_percentage: number
+        }
+        Insert: {
+          applicant_id: string
+          created_at?: string
+          criteria_scores?: Json
+          education_match_percentage: number
+          experience_match_percentage: number
+          id?: string
+          job_id?: string | null
+          key_phrases?: string[]
+          overall_match_percentage: number
+          skills_match_percentage: number
+        }
+        Update: {
+          applicant_id?: string
+          created_at?: string
+          criteria_scores?: Json
+          education_match_percentage?: number
+          experience_match_percentage?: number
+          id?: string
+          job_id?: string | null
+          key_phrases?: string[]
+          overall_match_percentage?: number
+          skills_match_percentage?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
