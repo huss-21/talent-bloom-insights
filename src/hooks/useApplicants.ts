@@ -1,8 +1,44 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Applicant, Rating } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+
+// Define a type for the raw application data from Supabase
+type RawApplicationData = {
+  id: string;
+  user_id: string;
+  job_id: string;
+  full_name: string;
+  email: string;
+  national_id?: string;
+  resume_url?: string;
+  resume_file_name?: string;
+  resume_file_path?: string;
+  applied_at: string;
+  status: string;
+  match_score?: number;
+  job_description?: string;
+  Skills?: number;
+  Education?: number;
+  Relevance?: number;
+  Overall?: number;
+  cover_letter?: string;
+  updated_at: string;
+};
+
+// Define a type for the raw rating data from Supabase
+type RawRatingData = {
+  id: string;
+  applicant_id: string;
+  criteria_scores: Record<string, number>;
+  overall_match_percentage: number;
+  skills_match_percentage: number;
+  education_match_percentage: number;
+  experience_match_percentage: number;
+  key_phrases: string[];
+  created_at: string;
+  job_id?: string;
+};
 
 // Mock data for applicants - keeping these for fallback purposes
 const MOCK_APPLICANTS: Applicant[] = [
@@ -126,12 +162,11 @@ export const useApplicants = () => {
       
       console.log("Fetching job applications, attempt:", fetchRetries + 1);
       
-      // 1. Fetch job applications from the new table
-      // Add 'as any' type assertion to fix TypeScript errors with Supabase
+      // 1. Fetch job applications from the new table using strong typing
       const { data: applicationsData, error: applicationsError } = await supabase
-        .from('job_applications' as any)
+        .from('job_applications')
         .select('*')
-        .order('applied_at', { ascending: false });
+        .order('applied_at', { ascending: false }) as { data: RawApplicationData[] | null, error: any };
 
       if (applicationsError) {
         throw applicationsError;
@@ -146,7 +181,7 @@ export const useApplicants = () => {
         console.log("No applications found in database, using mock data");
         setApplicants(MOCK_APPLICANTS);
       } else {
-        transformedApplicants = applicationsData.map((app: any) => ({
+        transformedApplicants = applicationsData.map((app: RawApplicationData) => ({
           id: app.id,
           userId: app.user_id,
           jobId: app.job_id,
@@ -170,12 +205,12 @@ export const useApplicants = () => {
         console.log("Transformed applications:", transformedApplicants);
       }
 
-      // 3. Fetch ratings from the database
+      // 3. Fetch ratings from the database with proper type annotations
       console.log("Fetching ratings data");
       const { data: ratingsData, error: ratingsError } = await supabase
-        .from('ratings' as any)
+        .from('ratings')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as { data: RawRatingData[] | null, error: any };
 
       if (ratingsError) {
         throw ratingsError;
@@ -186,13 +221,13 @@ export const useApplicants = () => {
         setRatings(MOCK_RATINGS);
       } else {
         // Transform data to match our Rating type
-        const transformedRatings: Rating[] = ratingsData.map((rating: any) => {
+        const transformedRatings: Rating[] = ratingsData.map((rating: RawRatingData) => {
           // Parse criteria_scores from JSON if needed
           let criteriaScores: Record<string, number> = {};
           
           try {
             if (typeof rating.criteria_scores === 'string') {
-              criteriaScores = JSON.parse(rating.criteria_scores);
+              criteriaScores = JSON.parse(rating.criteria_scores as unknown as string);
             } else if (rating.criteria_scores && typeof rating.criteria_scores === 'object') {
               criteriaScores = rating.criteria_scores as Record<string, number>;
             }
@@ -301,12 +336,12 @@ export const useApplicants = () => {
       let jobDescription = application.jobDescription || '';
       
       if (!jobDescription) {
-        // Fetch the job description from the jobs table
+        // Fetch the job description from the jobs table with proper type assertion
         const { data: jobData, error: jobError } = await supabase
-          .from('jobs' as any)
+          .from('jobs')
           .select('description')
           .eq('id', application.jobId)
-          .single();
+          .single() as { data: { description: string } | null, error: any };
         
         if (jobError) {
           console.error("Error fetching job description:", jobError);
@@ -315,9 +350,9 @@ export const useApplicants = () => {
         }
       }
       
-      // Insert into Supabase
+      // Insert into Supabase with proper type annotation
       const { data, error } = await supabase
-        .from('job_applications' as any)
+        .from('job_applications')
         .insert({
           user_id: application.userId,
           job_id: application.jobId,
@@ -331,7 +366,7 @@ export const useApplicants = () => {
           job_description: jobDescription // Store the job description
         })
         .select()
-        .single();
+        .single() as { data: RawApplicationData | null, error: any };
 
       if (error) {
         console.error("Supabase error:", error);
@@ -340,7 +375,7 @@ export const useApplicants = () => {
 
       console.log("Application created successfully:", data);
 
-      // Transform to our Applicant type
+      // Transform to our Applicant type with null checks
       const newApplicant: Applicant = {
         id: data?.id || '',
         userId: data?.user_id || '',
@@ -379,9 +414,9 @@ export const useApplicants = () => {
   const updateApplicationStatus = async (applicationId: string, status: string) => {
     try {
       const { error } = await supabase
-        .from('job_applications' as any)
+        .from('job_applications')
         .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', applicationId);
+        .eq('id', applicationId) as { error: any };
       
       if (error) throw error;
       
@@ -405,9 +440,9 @@ export const useApplicants = () => {
   // Add a rating for an applicant after resume analysis
   const addRating = async (rating: Omit<Rating, "id" | "createdAt">) => {
     try {
-      // Insert into Supabase
+      // Insert into Supabase with proper type assertions
       const { data, error } = await supabase
-        .from('ratings' as any)
+        .from('ratings')
         .insert({
           applicant_id: rating.applicantId,
           criteria_scores: rating.criteriaScores,
@@ -418,13 +453,13 @@ export const useApplicants = () => {
           key_phrases: rating.keyPhrases
         })
         .select()
-        .single();
+        .single() as { data: RawRatingData | null, error: any };
 
       if (error) {
         throw error;
       }
 
-      // Transform to our Rating type
+      // Transform to our Rating type with null safety
       const newRating: Rating = {
         id: data?.id || '',
         applicantId: data?.applicant_id || '',
@@ -442,7 +477,7 @@ export const useApplicants = () => {
       
       // Also update the match score in the job_applications table
       await supabase
-        .from('job_applications' as any)
+        .from('job_applications')
         .update({ 
           match_score: newRating.overallMatchPercentage,
           Skills: newRating.skillsMatchPercentage,
@@ -450,7 +485,7 @@ export const useApplicants = () => {
           Relevance: newRating.experienceMatchPercentage,
           Overall: newRating.overallMatchPercentage
         })
-        .eq('id', rating.applicantId);
+        .eq('id', rating.applicantId) as { error: any };
       
       // Update the applicant's scores in local state
       setApplicants(prevApplicants => 
@@ -553,10 +588,50 @@ export const useApplicants = () => {
     addApplication,
     updateApplicationStatus,
     addRating,
-    getApplicantsByJobId,
-    getRatingByApplicantId,
-    getApplicantsByUserId,
-    getResumeDownloadUrl,
+    getApplicantsByJobId: (jobId: string) => applicants.filter(applicant => applicant.jobId === jobId),
+    getRatingByApplicantId: (applicantId: string) => ratings.find(rating => rating.applicantId === applicantId) || null,
+    getApplicantsByUserId: (userId: string) => applicants.filter(applicant => applicant.userId === userId),
+    getResumeDownloadUrl: async (filePath: string) => {
+      try {
+        const maxRetries = 3;
+        let currentRetry = 0;
+        let downloadUrl = null;
+        
+        while (currentRetry < maxRetries && !downloadUrl) {
+          try {
+            const { data, error } = await supabase
+              .storage
+              .from('resumes')
+              .createSignedUrl(filePath, 60); // URL valid for 60 seconds
+            
+            if (error) {
+              throw error;
+            }
+            
+            downloadUrl = data.signedUrl;
+          } catch (err) {
+            currentRetry++;
+            
+            if (currentRetry >= maxRetries) {
+              throw err;
+            }
+            
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        return downloadUrl;
+      } catch (error) {
+        console.error("Error getting download URL:", error);
+        toast({
+          title: "Download failed",
+          description: "Could not generate download URL for the resume",
+          variant: "destructive",
+        });
+        return null;
+      }
+    },
     refreshData: fetchApplicantsAndRatings  // Export the refresh function
   };
 };

@@ -30,7 +30,7 @@ const queryClient = new QueryClient({
       retry: 3,
       retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000),
       staleTime: 30000,
-      // Updated to use meta.onError instead of onError directly
+      // Updated to use meta for error handling (compatible with latest React Query)
       meta: {
         onError: (error: Error) => {
           console.error("Query error:", error);
@@ -48,12 +48,12 @@ const App = () => {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        // Simple health check by trying to get the Supabase service version
-        // Updated to use explicit typing with 'from' call
-        const { data, error } = await supabase
+        // Create a simple query that will work even if the specific table doesn't exist
+        // We're using a type assertion to bypass TypeScript's strict checking
+        const { error } = await supabase
           .from('_anon_health_check' as any)
           .select('*')
-          .limit(1);
+          .limit(1) as { error: any };
         
         if (error && error.code !== 'PGRST116') {
           // PGRST116 is "No data found" which is expected for this check
