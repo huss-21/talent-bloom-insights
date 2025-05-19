@@ -3,8 +3,14 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { AlertCircle, Wifi, WifiOff } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const Index = () => {
+type IndexProps = {
+  connectionStatus?: 'checking' | 'connected' | 'error';
+};
+
+const Index = ({ connectionStatus = 'connected' }: IndexProps) => {
   const { currentUser } = useAuth();
 
   // If user is already logged in, redirect to their dashboard
@@ -18,6 +24,19 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Connection Status Alert */}
+      {connectionStatus === 'error' && (
+        <div className="fixed top-4 right-4 z-50 w-96 max-w-full">
+          <Alert variant="destructive">
+            <WifiOff className="h-4 w-4" />
+            <AlertTitle>Offline Mode</AlertTitle>
+            <AlertDescription>
+              You're currently viewing limited data in offline mode. Some features may not be available.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+      
       {/* Hero Section */}
       <section className="py-20 bg-gradient-to-br from-corporate-blue to-corporate-blue-light text-white">
         <div className="container mx-auto px-4 flex flex-col items-center text-center">
@@ -46,6 +65,26 @@ const Index = () => {
             >
               <a href="/register">Create Account</a>
             </Button>
+          </div>
+          
+          {/* Connection Status Indicator */}
+          <div className="mt-6 flex items-center justify-center text-sm">
+            {connectionStatus === 'checking' ? (
+              <span className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2 animate-pulse" />
+                Checking connection...
+              </span>
+            ) : connectionStatus === 'connected' ? (
+              <span className="flex items-center text-green-300">
+                <Wifi className="h-4 w-4 mr-2" />
+                Connected
+              </span>
+            ) : (
+              <span className="flex items-center text-yellow-300">
+                <WifiOff className="h-4 w-4 mr-2" />
+                Offline Mode
+              </span>
+            )}
           </div>
         </div>
       </section>
